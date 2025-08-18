@@ -1,0 +1,775 @@
+/* FRONTEND REVIEWS */
+
+:root {
+    --wc-custom-reviews-star-color: #ffb400;
+    --wc-custom-reviews-button-color: #0073aa;
+    --wc-custom-reviews-border-color: #e0e0e0;
+    --wc-custom-reviews-text-color: #333;
+    --wc-custom-reviews-light-bg: #f9f9f9;
+}
+
+/* ===  Resumo das Avaliações ===*/
+
+.reviews-title {
+    font-size: 22px;
+    color: var(--wc-custom-reviews-text-color);
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.reviews-summary {
+    background: #fff;
+    padding: 20px;
+    margin: 30px 0 30px 0;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.rating-overview {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+    width: 900px;
+    justify-self: center;
+    margin-bottom: 20px;
+}
+
+.average-rating {
+    text-align: center;
+    min-width: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.rating-number {
+    display: block;
+    font-size: 48px;
+    font-weight: 700;
+    color: var(--wc-custom-reviews-text-color);
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.average-rating .stars-display {
+    margin-bottom: 8px;
+}
+
+.average-rating .stars-display .star, .fa-solid.fa-star, .fa-solid.fa-star-half-stroke {
+    color: var(--wc-custom-reviews-star-color);
+}
+
+.fa-regular.fa-star {
+    color: #ddd;
+}
+
+.total-reviews {
+    color: var(--wc-custom-reviews-text-color);
+    font-size: 14px;
+}
+
+.rating-breakdown {
+    flex: 1;
+    border-left: 1px solid #EAE9E9;
+    border-right: 1px solid #EAE9E9;
+    padding: 0 70px 0 70px
+}
+
+.rating-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stars-display {
+    display: flex;
+    align-items: center;
+    gap: 6px
+}
+
+@media screen and (max-width: 1000px) {
+    .rating-overview {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        justify-self: center;
+    }
+    
+    .rating-breakdown {
+        border: none;
+    }
+     .rating-bar {
+        width: 400px;
+    }
+
+    .no-reviews {
+        flex-direction: column;
+        gap: 0!important;
+    }
+
+    .no-reviews-summary {
+        border: none!important
+    }
+
+    .review-button-container {
+        margin: 0px!important
+    }
+}
+
+@media screen and (min-width: 449px) and (max-width: 529px) {
+    
+    .rating-bar {
+        width: 350px;
+    }
+}
+
+@media screen and (min-width: 400px) and (max-width: 448px) {
+    
+    .rating-bar {
+        width: 300px;
+    }
+}
+
+@media screen and (max-width: 399px) {
+    
+    .rating-bar {
+        width: 260px;
+    }
+}
+
+.star-label {
+    min-width: 30px;
+    font-size: 14px;
+    color: var(--wc-custom-reviews-text-color);
+}
+
+.bar-container {
+    flex: 1;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bar-fill {
+    height: 100%;
+    background: var(--wc-custom-reviews-star-color);
+    transition: width 0.3s ease;
+}
+
+.bar-count {
+    min-width: 30px;
+    text-align: right;
+    font-size: 12px;
+    color: #666;
+}
+
+.no-reviews {
+    display: flex;
+    gap: 10px;
+}
+
+.no-reviews-summary {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    border-right: 1px solid #EAE9E9;
+}
+
+/* Lista de Comentários */
+
+/* Itens da grade: Definimos a largura para o Flexbox calcular as colunas. */
+.review-grid-item {
+    box-sizing: border-box;
+    padding: 16px;
+    color: #333333;
+    box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.1);
+    margin-bottom: 15px; /* Espaçamento vertical entre os cards */
+
+    /* --- A LÓGICA DE LARGURA CORRETA --- */
+    /* O cálculo subtrai o espaçamento (gap) para um encaixe perfeito. */
+
+    /* Padrão para telas muito pequenas (1 coluna) */
+}
+
+/* 2 colunas: Telas a partir de 481px ATÉ 899px */
+@media screen and (max-width: 899px) {
+    .review-grid-item {
+        width: calc(50% - 7.5px); /* 2 colunas com gap de 15px */
+    }
+}
+
+/* 3 colunas: Telas a partir de 900px */
+@media screen and (min-width: 900px) {
+    .review-grid-item {
+        width: calc(33.333% - 10px); /* 3 colunas com gap de 15px */
+    }
+}
+
+/* 4 colunas: Telas a partir de 1201px */
+@media screen and (min-width: 1201px) {
+    .review-grid-item {
+        width: calc(25% - 11.25px); /* 4 colunas com gap de 15px */
+    }
+}
+
+/* 5 colunas: Telas a partir de 1400px (ajuste conforme necessário para telas muito grandes) */
+@media screen and (min-width: 1400px) {
+    .review-grid-item {
+        width: calc(20% - 12px); /* 5 colunas com gap de 15px */
+    }
+}
+
+/* Estilos internos (permanecem os mesmos) */
+.review-image-grid img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    display: block;
+}
+.customer-info-grid, .review-text-grid {
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* === Botão de Avaliar === */
+.review-button-container {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.open-review-modal-btn {
+    background: var(--wc-custom-reviews-button-color)!important;
+    color: #fff!important;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 700!important;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.open-review-modal-btn:hover {
+    background: #005a87;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.open-review-modal-btn:active {
+    transform: translateY(0);
+}
+
+/* === Modal de Avaliação === */
+.wc-review-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.wc-review-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 600px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    animation: modalFadeIn 0.3s ease;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.wc-review-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.wc-review-modal-header h3 {
+    margin: 0;
+    font-size: 20px;
+    color: var(--wc-custom-reviews-text-color);
+}
+
+.wc-review-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.wc-review-modal-close:hover {
+    background: #f0f0f0;
+    color: #333;
+}
+
+.wc-review-modal-body {
+    padding: 24px;
+}
+
+/* === Formulário no Modal === */
+.wc-review-modal .form-row {
+    margin-bottom: 20px;
+}
+
+.wc-review-modal .form-row label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: var(--wc-custom-reviews-text-color);
+}
+
+.wc-review-modal .form-row input[type="text"],
+.wc-review-modal .form-row input[type="email"],
+.wc-review-modal .form-row textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.2s ease;
+    box-sizing: border-box;
+}
+
+.wc-review-modal .form-row input[type="text"]:focus,
+.wc-review-modal .form-row input[type="email"]:focus,
+.wc-review-modal .form-row textarea:focus {
+    outline: none;
+    border-color: var(--wc-custom-reviews-button-color);
+    box-shadow: 0 0 0 2px rgba(0, 115, 170, 0.1);
+}
+
+.wc-review-modal .rating-input {
+    display: flex;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.wc-review-modal .rating-input input[type="radio"] {
+    display: none;
+}
+
+.wc-review-modal .rating-input .star-label {
+    font-size: 24px;
+    color: #ddd;
+    cursor: pointer;
+    transition: color 0.2s ease;
+    margin-bottom: 0;
+    font-weight: normal;
+}
+
+.wc-review-modal .rating-input .star-label:hover,
+.wc-review-modal .rating-input .star-label.hovered {
+    color: var(--wc-custom-reviews-star-color);
+}
+
+.wc-review-modal .rating-input input[type="radio"]:checked + .star-label {
+    color: var(--wc-custom-reviews-star-color);
+}
+
+.wc-review-modal .submit-review-btn {
+    background: var(--wc-custom-reviews-button-color);
+    color: #fff;
+    border: none;
+    padding: 12px 24px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.wc-review-modal .submit-review-btn:hover {
+    background: #005a87;
+}
+
+.wc-review-modal .submit-review-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.wc-review-modal .form-messages {
+    margin-top: 15px;
+}
+
+.wc-review-modal .form-messages .success {
+    background: #d4edda;
+    color: #155724;
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid #c3e6cb;
+}
+
+.wc-review-modal .form-messages .error {
+    background: #f8d7da;
+    color: #721c24;
+    padding: 10px 15px;
+    border-radius: 4px;
+    border: 1px solid #f5c6cb;
+}
+
+.wc-review-modal .description {
+    font-size: 12px;
+    color: #666;
+    margin-top: 4px;
+    margin-bottom: 0;
+}
+
+/* === Responsividade do Modal === */
+@media (max-width: 768px) {
+    .wc-review-modal {
+        padding: 10px;
+    }
+    
+    .wc-review-modal-content {
+        max-height: 95vh;
+    }
+    
+    .wc-review-modal-header,
+    .wc-review-modal-body {
+        padding: 16px;
+    }
+    
+    .wc-review-modal-header h3 {
+        font-size: 18px;
+    }
+}
+
+
+/* === Previne scroll do body quando modal está aberto === */
+body.modal-open {
+    overflow: hidden;
+}
+
+
+
+/* === Responsividade da Mensagem de Sucesso no Modal === */
+.wc-review-modal .form-messages {
+    word-wrap: break-word; /* Garante que o texto quebre para caber no container */
+    overflow-wrap: break-word; /* Para navegadores modernos */
+    max-width: 100%; /* Garante que não ultrapasse a largura do pai */
+    box-sizing: border-box; /* Inclui padding e border no cálculo da largura */
+}
+
+.wc-review-modal .form-messages .success,
+.wc-review-modal .form-messages .error {
+    width: 100%; /* Ocupa 100% da largura disponível */
+    box-sizing: border-box; /* Inclui padding e border no cálculo da largura */
+    padding: 10px; /* Ajuste de padding para melhor visualização */
+    font-size: 14px; /* Ajuste de fonte para melhor visualização */
+    text-align: center; /* Centraliza o texto */
+}
+
+
+
+/* === Modal de Sucesso com Confetes === */
+.wc-success-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.wc-success-modal-content {
+    background: #fff;
+    border-radius: 16px;
+    max-width: 400px;
+    width: 100%;
+    padding: 40px 30px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: successModalFadeIn 0.5s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+@keyframes successModalFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.wc-success-modal .success-icon {
+    margin-bottom: 20px;
+    animation: successIconBounce 0.6s ease 0.3s both;
+}
+
+@keyframes successIconBounce {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.wc-success-modal h3 {
+    color: #4CAF50;
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 15px 0;
+    animation: successTextSlide 0.5s ease 0.5s both;
+}
+
+.wc-success-modal .success-message {
+    color: #666;
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0 0 30px 0;
+    animation: successTextSlide 0.5s ease 0.6s both;
+}
+
+@keyframes successTextSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.wc-success-modal-close {
+    background: #4CAF50;
+    color: #fff;
+    border: none;
+    padding: 12px 30px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    animation: successButtonSlide 0.5s ease 0.7s both;
+}
+
+.wc-success-modal-close:hover {
+    background: #45a049;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+@keyframes successButtonSlide {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.confetti {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: #ff6b6b;
+    animation: confettiFall 3s linear infinite;
+}
+
+.confetti:nth-child(2n) {
+    background: #4ecdc4;
+    animation-delay: -0.5s;
+}
+
+.confetti:nth-child(3n) {
+    background: #45b7d1;
+    animation-delay: -1s;
+}
+
+.confetti:nth-child(4n) {
+    background: #f9ca24;
+    animation-delay: -1.5s;
+}
+
+.confetti:nth-child(5n) {
+    background: #6c5ce7;
+    animation-delay: -2s;
+}
+
+.confetti:nth-child(6n) {
+    background: #a29bfe;
+    animation-delay: -2.5s;
+}
+
+@keyframes confettiFall {
+    0% {
+        transform: translateY(-100vh) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+/* === Responsividade do Modal de Sucesso === */
+@media (max-width: 768px) {
+    .wc-success-modal {
+        padding: 15px;
+    }
+    
+    .wc-success-modal-content {
+        padding: 30px 20px;
+    }
+    
+    .wc-success-modal h3 {
+        font-size: 20px;
+    }
+    
+    .wc-success-modal .success-message {
+        font-size: 14px;
+    }
+    
+    .wc-success-modal .success-icon svg {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* Confetti styles from CodePen */
+.confetti-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 9999;
+}
+
+.confetti {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: #f00;
+    opacity: 0;
+    animation: confetti-fall linear infinite;
+}
+
+@keyframes confetti-fall {
+    0% {
+        transform: translateY(-100px) rotateZ(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) rotateZ(720deg);
+        opacity: 0;
+    }
+}
+
+/* Validar formulários */
+.wc-review-modal .form-row input.error-field,
+.wc-review-modal .form-row textarea.error-field {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+/* Paginação */
+.wc-custom-reviews-pagination {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.wc-custom-reviews-pagination .pagination-button {
+    background-color: #f0f0f0;
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    margin: 0 5px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.wc-custom-reviews-pagination .pagination-button.active {
+    background-color: var(--wd-primary-color);
+    color: #fff;
+    border: none;
+}
+
+.wc-custom-reviews-pagination .pagination-button:hover:not(.active) {
+    background-color: #e0e0e0;
+}
+
+/* Spinner styles */
+
+.reviews-list {
+    position: relative; 
+    min-height: 100px; 
+}
+
+.loader {
+    position: absolute; /* Posicionamento absoluto para não afetar o fluxo do documento */
+    top: 50%; /* Centraliza verticalmente */
+    left: 50%; /* Centraliza horizontalmente */
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 8px solid #dddddd;
+    border-top-color: var(--wd-primary-color);
+    animation: spin 1s linear infinite;
+    display: none; /* Hidden by default */
+    z-index: 10; /* Garante que fique acima dos reviews */
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

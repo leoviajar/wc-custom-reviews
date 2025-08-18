@@ -1,0 +1,369 @@
+/* WC Custom Reviews - Admin Styles */
+
+/* Página de Configurações */
+.wc-custom-reviews-settings {
+    max-width: 800px;
+}
+
+.shortcode-info {
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.shortcode-info h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.shortcode-info p {
+    margin-bottom: 10px;
+}
+
+.shortcode-info strong {
+    background: #fff;
+    padding: 2px 6px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+/* Página de Comentários */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-badge.status-pendente {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.status-aprovado {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* Estrelas no Admin */
+.stars-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.stars-display .star {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.stars-display .star.filled {
+    color: #ffb400;
+}
+
+.stars-display .star.empty {
+    color: #ddd;
+}
+
+/* Ações da Tabela */
+.row-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.row-actions .button {
+    margin: 0;
+}
+
+/* Filtros */
+.tablenav .alignleft.actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#status-filter {
+    min-width: 150px;
+}
+
+/* Texto das Reviews */
+.review-text {
+    line-height: 1.4;
+    color: #555;
+}
+
+/* Responsividade para Admin */
+@media (max-width: 782px) {
+    .row-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .row-actions .button {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .tablenav .alignleft.actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    #status-filter {
+        width: 100%;
+    }
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Mensagens de Sucesso/Erro */
+.notice.wc-custom-reviews-notice {
+    margin: 15px 0;
+}
+
+.notice.wc-custom-reviews-notice p {
+    margin: 0.5em 0;
+}
+
+/* Configurações de Cor */
+.color-picker-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.color-preview {
+    width: 30px;
+    height: 30px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+/* Estatísticas */
+.reviews-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.stat-box {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: 700;
+    color: #0073aa;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 14px;
+}
+
+/* Modal de Edição */
+.edit-review-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.edit-review-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 4px;
+    max-width: 600px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+}
+
+.edit-review-content h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}
+
+.edit-review-content .form-table th {
+    width: 150px;
+    padding: 15px 10px 15px 0;
+}
+
+.edit-review-content .form-table td {
+    padding: 15px 0;
+}
+
+.edit-review-content .regular-text,
+.edit-review-content .large-text {
+    width: 100%;
+}
+
+/* Modal de visualização de imagem */
+#image-view-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 100001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-modal-overlay {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-modal-content {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 90%;
+    max-height: 90%;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.image-modal-header {
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.image-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.image-modal-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.image-modal-close:hover {
+    color: #000;
+}
+
+.image-modal-body {
+    padding: 20px;
+    text-align: center;
+}
+
+.image-modal-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+}
+
+.image-modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+}
+
+.image-modal-footer .button {
+    margin-left: 10px;
+}
+
+/* Estilos para o campo de imagem no formulário de edição */
+#current-image-container {
+    border: 1px dashed #ddd;
+    padding: 15px;
+    text-align: center;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+#current-review-image {
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+#no-image-text {
+    margin: 0;
+    font-style: italic;
+    color: #666;
+}
+
+/* Responsivo para modais */
+@media (max-width: 768px) {
+    .image-modal-content {
+        max-width: 95%;
+        max-height: 95%;
+    }
+    
+    .image-modal-header,
+    .image-modal-body,
+    .image-modal-footer {
+        padding: 15px;
+    }
+    
+    .image-modal-footer {
+        text-align: center;
+    }
+    
+    .image-modal-footer .button {
+        margin: 5px;
+        width: auto;
+    }
+}
+
+/* Força a exibição dos botões de ação sempre visíveis */
+.wp-list-table .row-actions {
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: static !important;
+    left: auto !important;
+}
+
+/* Remove a dependência do hover para mostrar as ações */
+.wp-list-table tr:hover .row-actions {
+    visibility: visible !important;
+}
+
