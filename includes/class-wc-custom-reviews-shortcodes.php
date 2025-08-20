@@ -136,7 +136,8 @@ class WC_Custom_Reviews_Shortcodes {
         // CORREÇÃO: Usa configuração do admin, mas permite override via POST
         $reviews_per_page = isset($_POST["reviews_per_page"]) ? intval($_POST["reviews_per_page"]) : $admin_reviews_per_page;
         
-        $review_order = isset($_POST["review_order"]) ? sanitize_text_field($_POST["review_order"]) : "recent";
+        $options = get_option("wc_custom_reviews_options");
+        $review_order = isset($options["review_order"]) ? $options["review_order"] : "recent";
 
         if (empty($product_id) || $page < 1 || $reviews_per_page < 1) {
             wp_send_json_error(array("message" => __("Dados inválidos para carregar avaliações.", "wc-custom-reviews")));
@@ -226,6 +227,9 @@ class WC_Custom_Reviews_Shortcodes {
         }
 
         $db = WC_Custom_Reviews_Database::get_instance();
+        $options = get_option("wc_custom_reviews_options");
+        $review_order = isset($options["review_order"]) ? $options["review_order"] : "recent";
+
         $reviews = $db->get_reviews_by_product($product_id, 'aprovado', $reviews_per_page, $offset, $review_order);
         $total_reviews = $db->get_total_reviews_by_product($product_id, 'aprovado');
         $total_pages = ceil($total_reviews / $reviews_per_page);
@@ -320,11 +324,42 @@ class WC_Custom_Reviews_Shortcodes {
                 <!-- Paginação -->
                 <?php if ($total_pages > 1) : ?>
                 <div class="wc-custom-reviews-pagination" data-product-id="<?php echo esc_attr($product_id); ?>" data-reviews-per-page="<?php echo esc_attr($reviews_per_page); ?>">
-                    <?php for ($p = 1; $p <= $total_pages; $p++) : ?>
-                        <button type="button" class="pagination-button <?php echo ($p == $current_page) ? 'active' : ''; ?>" data-page="<?php echo esc_attr($p); ?>">
-                            <?php echo esc_html($p); ?>
-                        </button>
-                    <?php endfor; ?>
+                    <?php
+                    $range = 2; // Número de páginas a mostrar antes e depois da página atual
+                    $start_page = max(1, $current_page - $range);
+                    $end_page = min($total_pages, $current_page + $range);
+
+                    // Botão 'Anterior'
+                    if ($current_page > 1) {
+                        echo '<button type="button" class="pagination-button" data-page="' . esc_attr($current_page - 1) . '">' . __('Anterior', 'wc-custom-reviews') . '</button>';
+                    }
+
+                    // Botão '1' se não estiver no range
+                    if ($start_page > 1) {
+                        echo '<button type="button" class="pagination-button" data-page="1">1</button>';
+                        if ($start_page > 2) {
+                            echo '<span class="pagination-dots">...</span>';
+                        }
+                    }
+
+                    // Números das páginas
+                    for ($p = $start_page; $p <= $end_page; $p++) {
+                        echo '<button type="button" class="pagination-button ' . (($p == $current_page) ? 'active' : '') . '" data-page="' . esc_attr($p) . '">' . esc_html($p) . '</button>';
+                    }
+
+                    // Botão 'Última' se não estiver no range
+                    if ($end_page < $total_pages) {
+                        if ($end_page < $total_pages - 1) {
+                            echo '<span class="pagination-dots">...</span>';
+                        }
+                        echo '<button type="button" class="pagination-button" data-page="' . esc_attr($total_pages) . '">' . esc_html($total_pages) . '</button>';
+                    }
+
+                    // Botão 'Próximo'
+                    if ($current_page < $total_pages) {
+                        echo '<button type="button" class="pagination-button" data-page="' . esc_attr($current_page + 1) . '">' . __('Próximo', 'wc-custom-reviews') . '</button>';
+                    }
+                    ?>
                 </div>
                 <?php endif; ?>
             </div>

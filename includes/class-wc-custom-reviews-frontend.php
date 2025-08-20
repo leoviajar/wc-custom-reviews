@@ -112,6 +112,8 @@ class WC_Custom_Reviews_Frontend {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('wc_custom_reviews_frontend_nonce'),
                 'strings' => array(
+                    'previous' => __('<i class="fa fa-chevron-left" aria-hidden="true"></i>', 'wc-custom-reviews'),
+                    'next'     => __('<i class="fa fa-chevron-right" aria-hidden="true"></i>', 'wc-custom-reviews'),
                     'required_fields' => __('Por favor, preencha todos os campos obrigatórios.', 'wc-custom-reviews'),
                     'invalid_email' => __('Por favor, insira um e-mail válido.', 'wc-custom-reviews'),
                     'select_rating' => __('Por favor, selecione uma avaliação.', 'wc-custom-reviews'),

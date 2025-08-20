@@ -728,18 +728,21 @@ body.modal-open {
 }
 
 .wc-custom-reviews-pagination .pagination-button {
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    padding: 8px 12px;
-    margin: 0 5px;
+    background-color: #ffffff;
+    border: none;
+    padding: 8px 11px;
     cursor: pointer;
     border-radius: 4px;
     font-size: 14px;
+    align-items: center;
+    text-align: center;
+    display: inline-block;
 }
 
 .wc-custom-reviews-pagination .pagination-button.active {
-    background-color: var(--wd-primary-color);
-    color: #fff;
+    color: var(--wd-primary-color);
+    font-size: 20px;
+    font-weight: 700;
     border: none;
 }
 

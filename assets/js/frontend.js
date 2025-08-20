@@ -1,5 +1,5 @@
 /**
- * WC Custom Reviews - Frontend JavaScript - VERSÃO CORRIGIDA V2
+ * WC Custom Reviews - Frontend JavaScript - VERSÃO CORRIGIDA V4
  * 
  * CORREÇÃO APLICADA: Scroll imediato ao clicar na paginação, antes do AJAX
  * para evitar que a tela desça e depois suba
@@ -403,13 +403,42 @@
                 if (response.success && response.data.reviews_html) {
                     $reviewsList.html(response.data.reviews_html);
                     
-                    // Atualiza os botões de paginação
+                    // Atualiza os botões de paginação com a lógica aprimorada
                     $paginationContainer.empty();
-                    for (var i = 1; i <= response.data.total_pages; i++) {
-                        var activeClass = (i == response.data.current_page) ? "active" : "";
-                        $paginationContainer.append(
-                            "<button type=\"button\" class=\"pagination-button " + activeClass + "\" data-page=\"" + i + "\">" + i + "</button>"
-                        );
+                    var totalPages = response.data.total_pages;
+                    var currentPage = response.data.current_page;
+                    var range = 2; // Número de páginas a mostrar antes e depois da página atual
+
+                    // Botão 'Anterior'
+                    if (currentPage > 1) {
+                        $paginationContainer.append('<button type="button" class="pagination-button" data-page="' + (currentPage - 1) + '">' + wcCustomReviews.strings.previous + '</button>');
+                    }
+
+                    // Botão '1' se não estiver no range
+                    if (currentPage - range > 1) {
+                        $paginationContainer.append('<button type="button" class="pagination-button" data-page="1">1</button>');
+                        if (currentPage - range > 2) {
+                            $paginationContainer.append('<span class="pagination-dots">...</span>');
+                        }
+                    }
+
+                    // Números das páginas
+                    for (var i = Math.max(1, currentPage - range); i <= Math.min(totalPages, currentPage + range); i++) {
+                        var activeClass = (i == currentPage) ? 'active' : '';
+                        $paginationContainer.append('<button type="button" class="pagination-button ' + activeClass + '" data-page="' + i + '">' + i + '</button>');
+                    }
+
+                    // Botão 'Última' se não estiver no range
+                    if (currentPage + range < totalPages) {
+                        if (currentPage + range < totalPages - 1) {
+                            $paginationContainer.append('<span class="pagination-dots">...</span>');
+                        }
+                        $paginationContainer.append('<button type="button" class="pagination-button" data-page="' + totalPages + '">' + totalPages + '</button>');
+                    }
+
+                    // Botão 'Próximo'
+                    if (currentPage < totalPages) {
+                        $paginationContainer.append('<button type="button" class="pagination-button" data-page="' + (currentPage + 1) + '">' + wcCustomReviews.strings.next + '</button>');
                     }
 
                     // Re-inicializa Masonry após carregar novos itens
