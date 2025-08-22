@@ -145,6 +145,7 @@
     min-width: 30px;
     font-size: 14px;
     color: var(--wc-custom-reviews-text-color);
+    text-align: end;
 }
 
 .bar-container {
