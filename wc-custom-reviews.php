@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WC Custom Reviews
  * Description: Plugin personalizado de reviews para WooCommerce com shortcodes e interface administrativa
- * Version: 1.0.4
+ * Version: 1.1.0
  * Author: Leonardo
  * Text Domain: wc-custom-reviews
  * Domain Path: /languages
@@ -37,6 +37,7 @@ define('WC_CUSTOM_REVIEWS_PLUGIN_FILE', __FILE__);
 
 // Carrega dependência necessária para ativação
 require_once WC_CUSTOM_REVIEWS_PLUGIN_DIR . 'includes/class-wc-custom-reviews-database.php';
+require_once WC_CUSTOM_REVIEWS_PLUGIN_DIR . 'includes/class-wc-custom-reviews-single-review.php';
 
 /**
  * Classe principal do plugin
@@ -124,6 +125,9 @@ class WC_Custom_Reviews {
 
         // Inicializa frontend
         WC_Custom_Reviews_Frontend::get_instance();
+
+        // Inicializa single review handler
+        WC_Custom_Reviews_Single_Review::get_instance();
     }
 
     /**
