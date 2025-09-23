@@ -491,4 +491,70 @@
         });
     }
 
+        // Adiciona a lógica para abrir o modal de review detalhado
+    $(document).on("click", ".review-grid-item", function() {
+        var reviewId = $(this).data("review-id");
+        if (reviewId) {
+            loadSingleReview(reviewId);
+        }
+    });
+
+    // Fecha o modal de review detalhado
+    $(document).on("click", ".wc-single-review-modal-close", function() {
+        closeSingleReviewModal();
+    });
+
+    // Fecha o modal ao clicar fora dele
+    $(document).on("click", ".wc-single-review-modal", function(e) {
+        if (e.target === this) {
+            closeSingleReviewModal();
+        }
+    });
+
+    // Fecha o modal ao pressionar ESC
+    $(document).on("keydown", function(e) {
+        if (e.keyCode === 27 && $("#wc-single-review-modal").is(":visible")) {
+            closeSingleReviewModal();
+        }
+    });
+
+    function loadSingleReview(reviewId) {
+        $.ajax({
+            url: wcCustomReviews.ajax_url,
+            type: "POST",
+            data: {
+                action: "wc_custom_reviews_get_single_review",
+                nonce: wcCustomReviews.nonce,
+                review_id: reviewId
+            },
+            beforeSend: function() {
+                // Pode adicionar um loader aqui
+            },
+            success: function(response) {
+                if (response.success && response.data.review_html) {
+                    $("#wc-single-review-modal .wc-single-review-modal-inner-content").html(response.data.review_html);
+                    $("#wc-single-review-modal").fadeIn(300);
+                    $("body").addClass("modal-open");
+                } else {
+                    console.error("Erro ao carregar review: ", response.data.message);
+                }
+            },
+            error: function() {
+                console.error("Erro na requisição AJAX para carregar review.");
+            },
+            complete: function() {
+                // Pode remover o loader aqui
+            }
+        });
+    }
+
+    function closeSingleReviewModal() {
+        $("#wc-single-review-modal").fadeOut(300, function() {
+            $("#wc-single-review-modal .wc-single-review-modal-inner-content").empty(); // Limpa o conteúdo
+        });
+        $("body").removeClass("modal-open");
+    }
+
+
 })(jQuery);
+

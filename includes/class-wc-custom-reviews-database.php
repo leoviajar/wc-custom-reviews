@@ -52,6 +52,24 @@ class WC_Custom_Reviews_Database {
 
         return $wpdb->get_var($sql);
     }
+
+    /**
+     * Obtém um review pelo ID
+     */
+    public function get_review_by_id($review_id) {
+        global $wpdb;
+
+        $review_id = absint($review_id);
+
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$this->table_name} 
+             WHERE id = %d",
+            $review_id
+        );
+
+        return $wpdb->get_row($sql);
+    }
+
     /**
      * Cria as tabelas necessárias
      */

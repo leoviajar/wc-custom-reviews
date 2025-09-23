@@ -429,6 +429,13 @@ class WC_Custom_Reviews_Shortcodes {
                 </div>
             </div>
         </div>
+
+        <div id="wc-single-review-modal" class="wc-single-review-modal" style="display: none;">
+            <div class="wc-single-review-modal-inner-content">
+                <!-- Conteúdo do review detalhado será carregado aqui via AJAX -->
+            </div>
+        </div>
+        
         <?php
         return ob_get_clean();
     }
