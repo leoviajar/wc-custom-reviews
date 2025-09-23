@@ -23,7 +23,21 @@
             var reviewOrder = $widget.data('review-order');
             loadReviews(productId, 1, reviewsPerPage, reviewOrder, $widget);
         });
+
+        $(".wc-custom-reviews-grid").each(function() {
+            var grid = this;
+            var msnry = new Masonry(grid, {
+                itemSelector: ".review-grid-item",
+                gutter: 15,
+                percentPosition: true
+            });
+
+            imagesLoaded(grid).on("progress", function() {
+                msnry.layout();
+            });
+        });
     });
+
 
     /**
      * FUNÇÃO CORRIGIDA: Inicializa eventos de paginação com scroll imediato
@@ -40,7 +54,7 @@
             var reviewOrder = $widget.data('review-order');
             
             // CORREÇÃO: Faz scroll IMEDIATAMENTE ao clicar, antes do AJAX
-            if (page > 1) { // Só faz scroll se não for a primeira página
+            if (page > 0) { // Só faz scroll se não for a primeira página
                 $('html, body').animate({
                     scrollTop: $widget.offset().top - 50 // 50px de margem do topo
                 }, 300); // Animação mais rápida (300ms)
@@ -478,4 +492,3 @@
     }
 
 })(jQuery);
-
