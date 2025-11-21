@@ -1162,20 +1162,35 @@ body.modal-open {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 24px;
-    height: 24px;
-    background: rgba(0, 0, 0, 0.7);
+    width: 20px;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.6);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     pointer-events: none;
+    backdrop-filter: blur(2px);
 }
 
 .modal-thumb .thumb-play-icon i {
     color: white;
-    font-size: 10px;
-    margin-left: 2px;
+    font-size: 8px;
+    margin-left: 1px;
+}
+
+/* Esconde controles nativos indesejados no WebKit (Chrome/Safari) */
+video::-webkit-media-controls-seek-back-button,
+video::-webkit-media-controls-seek-forward-button,
+video::-webkit-media-controls-rewind-button,
+video::-webkit-media-controls-fast-forward-button,
+video::-internal-media-controls-download-button {
+    display: none !important;
+}
+
+/* Tenta esconder botão de overflow (três pontinhos) onde costuma ficar o download/playback speed */
+video::-webkit-media-controls-overflow-button {
+    display: none !important;
 }
 
 .modal-thumb:hover {
@@ -1355,8 +1370,28 @@ body.modal-open {
         overflow: unset !important;
         flex-basis: auto;
         min-height: unset !important;
-        max-height: 80vh;
+        max-height: none !important;
         min-width: unset !important;
+        padding-bottom: 0 !important;
+        display: block !important;
+        height: auto !important;
+        background: #000 !important;
+    }
+
+    .modal-gallery, 
+    .modal-gallery-main {
+        height: auto !important;
+        display: block !important;
+    }
+
+    .modal-main-image,
+    .modal-main-video {
+        max-height: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        margin: 0 auto;
+        display: block;
     }
     
     .modal-info-section {
@@ -1373,7 +1408,28 @@ body.modal-open {
     }
     
     .modal-gallery-thumbs {
-        left: 50vw !important;
+        left: 50% !important;
+        transform: translateX(-50%);
+        bottom: 0 !important;
+        width: 100%;
+        justify-content: center;
+        z-index: 20;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    /* Esconde thumbnails quando o vídeo está tocando */
+    .wc-single-review-modal.video-playing .modal-gallery-thumbs {
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+    }
+
+    /* Fix close button on mobile */
+    .wc-single-review-modal .wc-single-review-modal-close {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 999999;
     }
 }
 

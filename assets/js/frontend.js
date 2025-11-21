@@ -617,6 +617,41 @@
         }
     });
 
+    // Toggle play/pause ao clicar no vídeo (já que removemos os controles nativos)
+    $(document).on("click", ".modal-main-video", function(e) {
+        e.preventDefault();
+        if (this.paused) {
+            this.play();
+        } else {
+            this.pause();
+        }
+    });
+
+    // Detecta play/pause em vídeos do modal para esconder thumbnails (Mobile)
+    // Usa capture phase (true) pois eventos de media não borbulham
+    if (document.addEventListener) {
+        document.addEventListener('play', function(e){
+            if(e.target && e.target.tagName === 'VIDEO' && e.target.closest('#wc-single-review-modal')){
+                var modal = document.getElementById('wc-single-review-modal');
+                if(modal) modal.classList.add('video-playing');
+            }
+        }, true);
+
+        document.addEventListener('pause', function(e){
+            if(e.target && e.target.tagName === 'VIDEO' && e.target.closest('#wc-single-review-modal')){
+                var modal = document.getElementById('wc-single-review-modal');
+                if(modal) modal.classList.remove('video-playing');
+            }
+        }, true);
+
+        document.addEventListener('ended', function(e){
+            if(e.target && e.target.tagName === 'VIDEO' && e.target.closest('#wc-single-review-modal')){
+                var modal = document.getElementById('wc-single-review-modal');
+                if(modal) modal.classList.remove('video-playing');
+            }
+        }, true);
+    }
+
     function loadSingleReview(reviewId) {
         $.ajax({
             url: wcCustomReviews.ajax_url,
@@ -667,6 +702,7 @@
         
         $("#wc-single-review-modal").fadeOut(300, function() {
             $("#wc-single-review-modal .wc-single-review-modal-inner-content").empty(); // Limpa o conteúdo
+            $("#wc-single-review-modal").removeClass('video-playing');
         });
         $("body").removeClass("modal-open");
     }
@@ -713,6 +749,9 @@
                 $currentVideo[0].pause();
             }
             
+            // Garante que as thumbnails reapareçam ao trocar de mídia
+            $('#wc-single-review-modal').removeClass('video-playing');
+            
             // Determina o próximo índice
             if ($button.hasClass('modal-gallery-next')) {
                 currentIndex = (currentIndex + 1) % allMedia.length;
@@ -724,7 +763,7 @@
             
             // Atualiza mídia principal
             if (media.type === 'video') {
-                $mainContainer.html('<video src="' + media.url + '" class="modal-main-image modal-main-video" controls></video>');
+                $mainContainer.html('<video src="' + media.url + '" class="modal-main-image modal-main-video" controlsList="nodownload noremoteplayback noplaybackrate" disablePictureInPicture playsinline webkit-playsinline></video>');
                 // Autoplay do vídeo
                 setTimeout(function() {
                     var videoElement = $mainContainer.find('video')[0];
@@ -761,11 +800,14 @@
                 $currentVideo[0].pause();
             }
             
+            // Garante que as thumbnails reapareçam ao trocar de mídia
+            $('#wc-single-review-modal').removeClass('video-playing');
+            
             var media = allMedia[index];
             
             // Atualiza mídia principal
             if (media.type === 'video') {
-                $mainContainer.html('<video src="' + media.url + '" class="modal-main-image modal-main-video" controls></video>');
+                $mainContainer.html('<video src="' + media.url + '" class="modal-main-image modal-main-video" controlsList="nodownload noremoteplayback noplaybackrate" disablePictureInPicture playsinline webkit-playsinline></video>');
                 // Autoplay do vídeo
                 setTimeout(function() {
                     var videoElement = $mainContainer.find('video')[0];

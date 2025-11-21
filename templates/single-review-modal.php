@@ -44,7 +44,7 @@ $shortcodes_instance = WC_Custom_Reviews_Shortcodes::get_instance();
                         <?php if ($all_media[0]['type'] === 'video') : ?>
                             <video src="<?php echo esc_url($all_media[0]['url']); ?>" 
                                    class="modal-main-image modal-main-video"
-                                   controls></video>
+                                   controlsList="nodownload noremoteplayback noplaybackrate" disablePictureInPicture playsinline webkit-playsinline></video>
                         <?php else : ?>
                             <img src="<?php echo esc_url($all_media[0]['url']); ?>" 
                                  alt="<?php esc_attr_e('Imagem do Cliente', 'wc-custom-reviews'); ?>"

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WC Custom Reviews
  * Description: Plugin personalizado de reviews para WooCommerce com shortcodes e interface administrativa
- * Version: 1.2.0
+ * Version: 1.2.1
  * Author: Leonardo
  * Text Domain: wc-custom-reviews
  * Domain Path: /languages
@@ -30,7 +30,7 @@ if (!defined('ABSPATH')) {
 }
 
 // Define constantes do plugin
-define('WC_CUSTOM_REVIEWS_VERSION', '1.2.0');
+define('WC_CUSTOM_REVIEWS_VERSION', '1.2.1');
 define('WC_CUSTOM_REVIEWS_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('WC_CUSTOM_REVIEWS_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('WC_CUSTOM_REVIEWS_PLUGIN_FILE', __FILE__);
