@@ -5,11 +5,15 @@ Plugin personalizado de reviews para WooCommerce com interface administrativa e 
 ## Características
 
 - ✅ **Compatível com HPOS** - Totalmente compatível com o novo sistema de armazenamento de pedidos do WooCommerce
+- 📸 **Múltiplas Imagens** - Clientes podem enviar até 10 fotos por avaliação com visualização em lightbox
 - 🎨 **Personalizável** - Configure cores das estrelas e botões através do painel administrativo
 - 📱 **Responsivo** - Interface adaptada para desktop e mobile
 - 🔧 **Fácil de usar** - Dois shortcodes simples para implementar em qualquer lugar
 - 👥 **Gerenciamento completo** - Interface administrativa para moderar comentários
 - 🔒 **Seguro** - Validações e sanitização de dados, proteção contra spam
+- 📊 **Import/Export CSV** - Importação em massa com download automático de imagens
+- 🔍 **Busca Avançada** - Pesquise por nome, e-mail, comentário ou produto
+- 🔄 **Detecção de Duplicados** - Identifique e remova avaliações duplicadas automaticamente
 
 ## Funcionalidades
 
@@ -19,13 +23,19 @@ Plugin personalizado de reviews para WooCommerce com interface administrativa e 
 - Exibição de shortcodes disponíveis
 - Gerenciamento de comentários (aprovar, rejeitar, excluir)
 - Filtros por status dos comentários
+- **Importação/Exportação CSV** com download automático de imagens
+- **Busca em múltiplos campos** (nome, e-mail, comentário, produto)
+- **Detecção de duplicados** com filtros customizáveis e processamento em lote
 
 ### Frontend
 - **Shortcode de Estrelas**: `[wc_custom_reviews_stars product_id="123"]`
 - **Widget Completo**: `[wc_custom_reviews_widget product_id="123"]`
+- **Upload de múltiplas imagens** (até 10 fotos por avaliação)
+- **Galeria de thumbnails** clicáveis com lightbox para visualização
 - Formulário de avaliação com validação
 - Exibição de estatísticas de avaliações
 - Sistema de estrelas interativo
+- Navegação por teclado no lightbox (setas, ESC)
 
 ## Instalação
 

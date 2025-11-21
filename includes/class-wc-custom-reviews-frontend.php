@@ -58,19 +58,11 @@ class WC_Custom_Reviews_Frontend {
                 WC_CUSTOM_REVIEWS_VERSION
             );
 
-            wp_enqueue_script(
-                'wc-custom-reviews-frontend',
-                WC_CUSTOM_REVIEWS_PLUGIN_URL . 'assets/js/frontend.js',
-                array('jquery'),
-                WC_CUSTOM_REVIEWS_VERSION,
-                true
-            );
-
             // Enfileira imagesLoaded
             wp_enqueue_script(
                 'imagesloaded',
                 'https://unpkg.com/imagesloaded@5/imagesloaded.pkgd.min.js',
-                array('jquery' ),
+                array('jquery'),
                 '5.0.0',
                 true
             );
@@ -79,31 +71,25 @@ class WC_Custom_Reviews_Frontend {
             wp_enqueue_script(
                 'masonry',
                 'https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js',
-                array('imagesloaded' ),
+                array('imagesloaded'),
                 '4.2.2',
                 true
             );
 
-            wp_enqueue_script(
-                'wc-custom-reviews-frontend',
-                WC_CUSTOM_REVIEWS_PLUGIN_URL . 'assets/js/frontend.js',
-                array('jquery', 'masonry', 'imagesloaded'), // Adiciona masonry e imagesloaded como dependências
-                WC_CUSTOM_REVIEWS_VERSION,
-                true
-            );
-
+            // Enfileira Confetti
             wp_enqueue_script(
                 'confetti-js',
                 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js',
-                array( ),
+                array(),
                 '1.9.2',
                 true
             );
 
+            // Enfileira script principal (consolidado com todas as dependências)
             wp_enqueue_script(
                 'wc-custom-reviews-frontend',
                 WC_CUSTOM_REVIEWS_PLUGIN_URL . 'assets/js/frontend.js',
-                array('jquery', 'masonry', 'imagesloaded', 'confetti-js'), // Adiciona confetti-js como dependência
+                array('jquery', 'masonry', 'imagesloaded', 'confetti-js'),
                 WC_CUSTOM_REVIEWS_VERSION,
                 true
             );
@@ -159,14 +145,18 @@ class WC_Custom_Reviews_Frontend {
         $rating = isset($_POST['rating']) ? intval($_POST['rating']) : 0;
         $review_text = sanitize_textarea_field($_POST['review_text']);
         
-        $image_url = null;
+        $image_urls = array();
+        $video_url = null;
 
-        // Processa o upload da imagem, se houver e se a funcionalidade estiver habilitada
+        // Processa o upload de múltiplas imagens e vídeos (até 10 itens, sendo 1 vídeo)
         $options = get_option('wc_custom_reviews_options');
         $enable_image_upload = isset($options['enable_image_upload']) ? $options['enable_image_upload'] : 'yes';
 
-        if ($enable_image_upload === 'yes' && isset($_FILES['review_image']) && $_FILES['review_image']['error'] === UPLOAD_ERR_OK) {
-            // Inclui os arquivos necessários para o upload de mídia do WordPress
+        if ($enable_image_upload === 'yes' && isset($_FILES['review_images'])) {
+            // Log para debug
+            error_log('WC Custom Reviews: FILES recebidos - ' . print_r($_FILES['review_images'], true));
+            
+            // Inclui os arquivos necessários
             if (!function_exists('wp_handle_upload')) {
                 require_once(ABSPATH . 'wp-admin/includes/file.php');
             }
@@ -177,48 +167,85 @@ class WC_Custom_Reviews_Frontend {
                 require_once(ABSPATH . 'wp-admin/includes/media.php');
             }
 
-            $uploaded_file = $_FILES['review_image'];
-
-            // Define as substituições para o upload (tipos de arquivo permitidos, etc.)
-            $upload_overrides = array(
-                'test_form' => false, // Importante para uploads via AJAX
-                'mimes' => array(
-                    'jpg|jpeg|jpe' => 'image/jpeg',
-                    'png' => 'image/png',
-                    'gif' => 'image/gif'
-                )
-            );
+            // Limite de 10 arquivos no total
+            $max_files = 10;
+            $uploaded_count = 0;
             
-            // Limite de tamanho de arquivo (2MB)
-            $max_file_size = 2 * 1024 * 1024; // 2MB em bytes
-            if ($uploaded_file['size'] > $max_file_size) {
-                wp_send_json_error(array('message' => __('A imagem excede o tamanho máximo permitido de 2MB.', 'wc-custom-reviews')));
-            }
+            // $_FILES['review_images'] contém arrays de name, type, tmp_name, error, size
+            $files = $_FILES['review_images'];
+            
+            // Reorganiza o array para facilitar o processamento
+            if (is_array($files['name'])) {
+                $file_count = count($files['name']);
+                error_log('WC Custom Reviews: ' . $file_count . ' arquivos detectados');
+                
+                for ($i = 0; $i < min($file_count, $max_files); $i++) {
+                    if ($files['error'][$i] === UPLOAD_ERR_OK) {
+                        $file_type = $files['type'][$i];
+                        $is_video = strpos($file_type, 'video/') === 0;
+                        
+                        // Limite de tamanho: 2MB para imagens, 50MB para vídeos
+                        $max_file_size = $is_video ? (50 * 1024 * 1024) : (2 * 1024 * 1024);
+                        if ($files['size'][$i] > $max_file_size) {
+                            continue; // Pula arquivos muito grandes
+                        }
+                        
+                        // Se já temos um vídeo, pula outros vídeos
+                        if ($is_video && $video_url !== null) {
+                            continue;
+                        }
 
-            // Move o arquivo para o diretório de uploads do WordPress
-            $movefile = wp_handle_upload($uploaded_file, $upload_overrides);
+                        $upload_overrides = array(
+                            'test_form' => false,
+                            'mimes' => array(
+                                'jpg|jpeg|jpe' => 'image/jpeg',
+                                'png' => 'image/png',
+                                'gif' => 'image/gif',
+                                'mp4' => 'video/mp4',
+                                'webm' => 'video/webm',
+                                'ogg' => 'video/ogg'
+                            )
+                        );
 
-            if ($movefile && !isset($movefile['error'])) {
-                // O arquivo foi movido com sucesso
-                $image_url = $movefile['url'];
+                        // Cria array similar ao $_FILES para cada arquivo
+                        $single_file = array(
+                            'name' => $files['name'][$i],
+                            'type' => $files['type'][$i],
+                            'tmp_name' => $files['tmp_name'][$i],
+                            'error' => $files['error'][$i],
+                            'size' => $files['size'][$i]
+                        );
 
-                // Opcional: Anexar a imagem à biblioteca de mídia do WordPress
-                // Isso é útil para gerenciar a imagem via WP Admin > Mídia
-                $attachment = array(
-                    'guid'           => $movefile['url'], 
-                    'post_mime_type' => $movefile['type'],
-                    'post_title'     => sanitize_file_name($uploaded_file['name']),
-                    'post_content'   => '',
-                    'post_status'    => 'inherit'
-                );
-                $attach_id = wp_insert_attachment($attachment, $movefile['file']);
-                wp_update_attachment_metadata($attach_id, wp_generate_attachment_metadata($attach_id, $movefile['file']));
+                        $movefile = wp_handle_upload($single_file, $upload_overrides);
 
-            } else {
-                // Houve um erro no upload
-                wp_send_json_error(array('message' => __('Erro no upload da imagem: ', 'wc-custom-reviews') . $movefile['error']));
+                        if ($movefile && !isset($movefile['error'])) {
+                            if ($is_video) {
+                                $video_url = $movefile['url'];
+                            } else {
+                                $image_urls[] = $movefile['url'];
+                            }
+
+                            // Anexa à biblioteca de mídia
+                            $attachment = array(
+                                'guid' => $movefile['url'],
+                                'post_mime_type' => $movefile['type'],
+                                'post_title' => sanitize_file_name($files['name'][$i]),
+                                'post_content' => '',
+                                'post_status' => 'inherit'
+                            );
+                            $attach_id = wp_insert_attachment($attachment, $movefile['file']);
+                            wp_update_attachment_metadata($attach_id, wp_generate_attachment_metadata($attach_id, $movefile['file']));
+                            
+                            $uploaded_count++;
+                        }
+                    }
+                }
             }
         }
+        
+        // Converte array de URLs em JSON para armazenar no banco
+        $images_json = !empty($image_urls) ? json_encode($image_urls) : null;
+        error_log('WC Custom Reviews: Imagens - ' . count($image_urls) . ' | Vídeo: ' . ($video_url ? 'sim' : 'não'));
 
         // Validações (mantenha como está)
                 if (empty($product_id) || empty($customer_name) || empty($customer_email) || empty($rating) || empty($review_text)) {
@@ -252,7 +279,8 @@ class WC_Custom_Reviews_Frontend {
             'rating' => $rating,
             'review_text' => $review_text,
             'status' => $review_status,
-            'image_url' => $image_url // Passa a URL da imagem
+            'image_url' => $images_json, // Passa JSON com múltiplas URLs de imagens
+            'video_url' => $video_url // URL do vídeo (se houver)
         );
         
         $review_id = $db->insert_review($review_data);

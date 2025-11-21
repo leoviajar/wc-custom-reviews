@@ -40,6 +40,12 @@ class WC_Custom_Reviews_Admin {
         // NOVO: Adiciona handler para importação CSV
         add_action('wp_ajax_wc_custom_reviews_import_csv', array($this, 'ajax_import_csv'));
         add_action('admin_post_wc_custom_reviews_import_csv', array($this, 'handle_csv_import'));
+        
+        // NOVO: Adiciona handler para exportação CSV
+        add_action('admin_post_wc_custom_reviews_export_csv', array($this, 'handle_csv_export'));
+        
+        // NOVO: Adiciona handler para processar todos os duplicados
+        add_action('wp_ajax_wc_custom_reviews_process_all_duplicates', array($this, 'ajax_process_all_duplicates'));
 
         add_action('wp_ajax_wc_custom_reviews_bulk_delete', array($this, 'ajax_bulk_delete_reviews'));
     }
@@ -77,6 +83,16 @@ class WC_Custom_Reviews_Admin {
             'manage_options',
             'wc-custom-reviews-comments',
             array($this, 'admin_page_comments')
+        );
+
+        // Submenu - Duplicados
+        add_submenu_page(
+            'wc-custom-reviews',
+            __('Duplicados', 'wc-custom-reviews'),
+            __('Duplicados', 'wc-custom-reviews'),
+            'manage_options',
+            'wc-custom-reviews-duplicates',
+            array($this, 'admin_page_duplicates')
         );
 
         // NOVO: Submenu - Importar CSV
@@ -483,19 +499,44 @@ class WC_Custom_Reviews_Admin {
                 continue;
             }
 
-            // NOVO: Processa download da imagem se necessário
+            // NOVO: Processa download das imagens se necessário
             if ($download_images && !empty($photo_url)) {
-                $attachment_id = $this->download_and_store_image($photo_url, $review_data['product_id']);
-                if (!is_wp_error($attachment_id) && $attachment_id) {
-                    $review_data['image_url'] = wp_get_attachment_url($attachment_id);
-                    $downloaded++;
+                // Separa múltiplas URLs por vírgula
+                $photo_urls = array_map('trim', explode(',', $photo_url));
+                $image_urls_array = array();
+                
+                foreach ($photo_urls as $single_photo_url) {
+                    if (empty($single_photo_url)) continue;
+                    
+                    $attachment_id = $this->download_and_store_image($single_photo_url, $review_data['product_id']);
+                    if (!is_wp_error($attachment_id) && $attachment_id) {
+                        $image_urls_array[] = wp_get_attachment_url($attachment_id);
+                        $downloaded++;
+                    } else {
+                        // Se falhou o download, mantém a URL original
+                        $image_urls_array[] = $single_photo_url;
+                        $errors[] = sprintf(__('Linha %d: não foi possível baixar a imagem %s.', 'wc-custom-reviews'), $line_number, $single_photo_url);
+                    }
+                }
+                
+                // Armazena como JSON se houver múltiplas imagens, ou única URL se for só uma
+                if (count($image_urls_array) > 1) {
+                    $review_data['image_url'] = json_encode($image_urls_array);
+                } elseif (count($image_urls_array) === 1) {
+                    $review_data['image_url'] = $image_urls_array[0];
                 } else {
-                    // Se falhou o download, mantém a URL original
+                    $review_data['image_url'] = null;
+                }
+            } elseif (!empty($photo_url)) {
+                // Sem download, mas ainda processa múltiplas URLs
+                $photo_urls = array_map('trim', explode(',', $photo_url));
+                if (count($photo_urls) > 1) {
+                    $review_data['image_url'] = json_encode($photo_urls);
+                } else {
                     $review_data['image_url'] = $photo_url;
-                    $errors[] = sprintf(__('Linha %d: não foi possível baixar a imagem %s.', 'wc-custom-reviews'), $line_number, $photo_url);
                 }
             } else {
-                $review_data['image_url'] = $photo_url;
+                $review_data['image_url'] = null;
             }
 
             // Insere a avaliação
@@ -739,19 +780,40 @@ class WC_Custom_Reviews_Admin {
         // Filtro por status
         $status_filter = isset($_GET['status']) ? sanitize_text_field($_GET['status']) : '';
         
-        // Obtém reviews
-        $options = get_option('wc_custom_reviews_options');
-        $review_order = isset($options['review_order']) ? $options['review_order'] : 'recent';
-
-        $reviews = $db->get_all_reviews($status_filter, $per_page, $offset, $review_order);
+        // Filtro por busca
+        $search_query = isset($_GET['s']) ? sanitize_text_field($_GET['s']) : '';
+        
+        // Obtém reviews - SEMPRE ordena por data no admin (independente da configuração do frontend)
+        $reviews = $db->get_all_reviews($status_filter, $per_page, $offset, 'recent', $search_query);
         
         // Obtém total de reviews para paginação
-        $total_reviews = $db->get_total_all_reviews($status_filter);
+        $total_reviews = $db->get_total_all_reviews($status_filter, $search_query);
         $total_pages = ceil($total_reviews / $per_page);
 
         ?>
         <div class="wrap">
-            <h1><?php _e('Custom Reviews - Comentários', 'wc-custom-reviews'); ?></h1>
+            <h1><?php _e('Custom Reviews - Comentários', 'wc-custom-reviews'); ?>
+                <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=wc_custom_reviews_export_csv'), 'wc-custom-reviews-export-csv')); ?>" class="page-title-action">
+                    <span class="dashicons dashicons-download" style="margin-top: 3px;"></span>
+                    <?php _e('Exportar CSV', 'wc-custom-reviews'); ?>
+                </a>
+            </h1>
+            
+            <!-- Campo de busca -->
+            <form method="get" action="" style="margin: 20px 0;">
+                <input type="hidden" name="page" value="wc-custom-reviews-comments">
+                <?php if (!empty($status_filter)) : ?>
+                    <input type="hidden" name="status" value="<?php echo esc_attr($status_filter); ?>">
+                <?php endif; ?>
+                <p class="search-box">
+                    <label class="screen-reader-text" for="review-search-input"><?php _e('Buscar reviews:', 'wc-custom-reviews'); ?></label>
+                    <input type="search" id="review-search-input" name="s" value="<?php echo esc_attr($search_query); ?>" placeholder="<?php _e('Buscar por nome, email, comentário ou produto...', 'wc-custom-reviews'); ?>" style="width: 400px;">
+                    <button type="submit" class="button"><?php _e('Buscar', 'wc-custom-reviews'); ?></button>
+                    <?php if (!empty($search_query)) : ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=wc-custom-reviews-comments' . (!empty($status_filter) ? '&status=' . $status_filter : ''))); ?>" class="button"><?php _e('Limpar busca', 'wc-custom-reviews'); ?></a>
+                    <?php endif; ?>
+                </p>
+            </form>
             
             <!-- Filtros e Ações em Massa -->
             <div class="tablenav top">
@@ -778,15 +840,30 @@ class WC_Custom_Reviews_Admin {
                     <div class="tablenav-pages">
                         <span class="displaying-num">
                             <?php 
-                            printf(
-                                _n('%s item', '%s itens', $total_reviews, 'wc-custom-reviews'), 
-                                number_format_i18n($total_reviews)
-                            ); 
+                            if (!empty($search_query)) {
+                                printf(
+                                    _n('%s resultado encontrado', '%s resultados encontrados', $total_reviews, 'wc-custom-reviews'), 
+                                    number_format_i18n($total_reviews)
+                                );
+                            } else {
+                                printf(
+                                    _n('%s item', '%s itens', $total_reviews, 'wc-custom-reviews'), 
+                                    number_format_i18n($total_reviews)
+                                );
+                            }
                             ?>
                         </span>
                         <?php
+                        $base_args = array('page' => 'wc-custom-reviews-comments');
+                        if (!empty($status_filter)) {
+                            $base_args['status'] = $status_filter;
+                        }
+                        if (!empty($search_query)) {
+                            $base_args['s'] = $search_query;
+                        }
+                        
                         $pagination_args = array(
-                            'base' => add_query_arg('paged', '%#%'),
+                            'base' => add_query_arg(array_merge($base_args, array('paged' => '%#%'))),
                             'format' => '',
                             'prev_text' => '&laquo;',
                             'next_text' => '&raquo;',
@@ -797,10 +874,6 @@ class WC_Custom_Reviews_Admin {
                             'mid_size' => 2,
                             'type' => 'plain',
                         );
-                        
-                        if (!empty($status_filter)) {
-                            $pagination_args['base'] = add_query_arg(array('status' => $status_filter, 'paged' => '%#%'));
-                        }
                         
                         echo '<span class="pagination-links">';
                         echo paginate_links($pagination_args);
@@ -862,7 +935,39 @@ class WC_Custom_Reviews_Admin {
                                     </div>
                                 </td>
                                 <td>
-                                    <?php if (!empty($review->image_url)) : ?>
+                                    <?php 
+                                    // Decodifica múltiplas imagens se estiver em JSON
+                                    $image_urls = !empty($review->image_url) ? json_decode($review->image_url, true) : array();
+                                    $video_url = !empty($review->video_url) ? $review->video_url : null;
+                                    
+                                    // Prioriza vídeo
+                                    if (!empty($video_url)) : 
+                                        $video_url_with_time = $video_url . '#t=0.1';
+                                        ?>
+                                        <div style="position: relative; width: 50px; height: 50px; cursor: pointer;" 
+                                             onclick="openImageModal('<?php echo esc_url($video_url); ?>', <?php echo $review->id; ?>)">
+                                            <video src="<?php echo esc_url($video_url_with_time); ?>" 
+                                                   muted 
+                                                   preload="metadata"
+                                                   style="width: 50px; height: 50px; object-fit: cover; border-radius: 3px; background: #000;"></video>
+                                            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 16px;">
+                                                <i class="dashicons dashicons-controls-play"></i>
+                                            </div>
+                                        </div>
+                                    <?php elseif (is_array($image_urls)) : 
+                                        // Múltiplas imagens
+                                        ?>
+                                        <div class="admin-review-images" style="display: flex; gap: 3px; flex-wrap: wrap;">
+                                            <?php foreach ($image_urls as $index => $img_url) : ?>
+                                                <img src="<?php echo esc_url($img_url); ?>" 
+                                                    alt="<?php echo esc_attr(sprintf(__('Imagem %d', 'wc-custom-reviews'), $index + 1)); ?>" 
+                                                    style="width: 40px; height: 40px; object-fit: cover; cursor: pointer; border-radius: 3px;" 
+                                                    onclick="openImageModal('<?php echo esc_url($img_url); ?>', <?php echo $review->id; ?>)">
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php elseif (!empty($review->image_url)) : 
+                                        // Imagem única (formato antigo)
+                                        ?>
                                         <img src="<?php echo esc_url($review->image_url); ?>" 
                                             alt="<?php echo esc_attr__('Imagem da Avaliação', 'wc-custom-reviews'); ?>" 
                                             style="width: 50px; height: 50px; object-fit: cover; cursor: pointer; border-radius: 3px;" 
@@ -978,18 +1083,19 @@ class WC_Custom_Reviews_Admin {
                         
                         <tr>
                             <th scope="row">
-                                <label for="edit_image_url"><?php _e('Imagem', 'wc-custom-reviews'); ?></label>
+                                <label for="edit_image_url"><?php _e('Imagens e Vídeos', 'wc-custom-reviews'); ?></label>
                             </th>
                             <td>
-                                <div style="margin-bottom: 10px;">
-                                    <img id="current-review-image" src="" alt="<?php _e('Imagem atual', 'wc-custom-reviews'); ?>" style="max-width: 150px; max-height: 150px; display: none; border: 1px solid #ddd; padding: 5px;" />
-                                    <p id="no-image-text" style="color: #666; font-style: italic;"><?php _e('Nenhuma imagem selecionada', 'wc-custom-reviews'); ?></p>
+                                <div id="current-review-images-container" style="margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 10px;">
+                                    <p id="no-image-text" style="color: #666; font-style: italic;"><?php _e('Nenhuma mídia selecionada', 'wc-custom-reviews'); ?></p>
                                 </div>
                                 
                                 <input type="hidden" id="edit_image_url" name="image_url" />
+                                <input type="hidden" id="edit_video_url" name="video_url" />
                                 
-                                <button type="button" id="upload-image-btn" class="button"><?php _e('Selecionar Imagem', 'wc-custom-reviews'); ?></button>
-                                <button type="button" id="remove-image-btn" class="button" style="display: none;"><?php _e('Remover Imagem', 'wc-custom-reviews'); ?></button>
+                                <button type="button" id="upload-image-btn" class="button"><?php _e('Selecionar Mídias', 'wc-custom-reviews'); ?></button>
+                                <button type="button" id="remove-all-images-btn" class="button" style="display: none;"><?php _e('Remover Todas', 'wc-custom-reviews'); ?></button>
+                                <p class="description"><?php _e('Você pode selecionar até 10 imagens e 1 vídeo para esta avaliação', 'wc-custom-reviews'); ?></p>
                             </td>
                         </tr>
                     </table>
@@ -1476,7 +1582,29 @@ class WC_Custom_Reviews_Admin {
         $rating = intval($_POST['rating']);
         $status = sanitize_text_field($_POST['status']);
         $review_text = sanitize_textarea_field($_POST['review_text']);
-        $image_url = isset($_POST['image_url']) ? esc_url_raw($_POST['image_url']) : '';
+        
+        // Processa múltiplas imagens
+        $image_url = '';
+        if (!empty($_POST['image_url'])) {
+            $raw_value = stripslashes($_POST['image_url']); // Remove escapes do jQuery
+            
+            // Verifica se já é JSON válido
+            $decoded = json_decode($raw_value, true);
+            if (is_array($decoded)) {
+                // Já é JSON, sanitiza cada URL
+                $sanitized_urls = array_map('esc_url_raw', $decoded);
+                $image_url = json_encode($sanitized_urls);
+            } else {
+                // É uma URL única, sanitiza
+                $image_url = esc_url_raw($raw_value);
+            }
+        }
+        
+        // Processa vídeo
+        $video_url = '';
+        if (!empty($_POST['video_url'])) {
+            $video_url = esc_url_raw(stripslashes($_POST['video_url']));
+        }
 
         if (empty($review_id) || empty($customer_name) || empty($customer_email)) {
             wp_send_json_error(array('message' => __('Dados obrigatórios não preenchidos.', 'wc-custom-reviews')));
@@ -1494,10 +1622,11 @@ class WC_Custom_Reviews_Admin {
                 'rating' => $rating,
                 'status' => $status,
                 'review_text' => $review_text,
-                'image_url' => $image_url
+                'image_url' => $image_url,
+                'video_url' => $video_url
             ),
             array('id' => $review_id),
-            array('%s', '%s', '%d', '%s', '%s', '%s'),
+            array('%s', '%s', '%d', '%s', '%s', '%s', '%s'),
             array('%d')
         );
 
@@ -1506,6 +1635,578 @@ class WC_Custom_Reviews_Admin {
         } else {
             wp_send_json_error(array('message' => __('Erro ao atualizar review.', 'wc-custom-reviews')));
         }
+    }
+
+    /**
+     * Handler para exportação CSV
+     * Exporta todos os reviews no formato compatível com importação
+     */
+    public function handle_csv_export() {
+        // Verifica permissões
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Você não tem permissão para acessar esta página.', 'wc-custom-reviews'));
+        }
+
+        // Verifica nonce
+        check_admin_referer('wc-custom-reviews-export-csv', '_wpnonce');
+
+        global $wpdb;
+        $db = WC_Custom_Reviews_Database::get_instance();
+        $table_name = $db->get_table_name();
+
+        // Busca TODOS os reviews (sem limite)
+        $reviews = $wpdb->get_results("SELECT * FROM {$table_name} ORDER BY id ASC");
+
+        // Define headers para download
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="wc-custom-reviews-' . date('Y-m-d-His') . '.csv"');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+
+        // Abre output buffer
+        $output = fopen('php://output', 'w');
+
+        // Escreve cabeçalho do CSV (formato compatível com importação)
+        fputcsv($output, array('id', 'rating', 'name', 'email', 'review', 'photo'));
+
+        // Escreve cada review
+        if (!empty($reviews)) {
+            foreach ($reviews as $review) {
+                // Decodifica múltiplas imagens se estiver em JSON
+                $photo_value = '';
+                if (!empty($review->image_url)) {
+                    $decoded = json_decode($review->image_url, true);
+                    if (is_array($decoded)) {
+                        // Se for array, junta com vírgulas
+                        $photo_value = implode(',', $decoded);
+                    } else {
+                        // Se não for JSON, é uma URL única
+                        $photo_value = $review->image_url;
+                    }
+                }
+                
+                $row = array(
+                    $review->product_id,                                    // id (product_id)
+                    $review->rating,                                        // rating
+                    $review->customer_name,                                 // name
+                    $review->customer_email,                                // email
+                    $review->review_text,                                   // review
+                    $photo_value                                            // photo (URLs separadas por vírgula)
+                );
+                fputcsv($output, $row);
+            }
+        }
+
+        fclose($output);
+        exit;
+    }
+
+    /**
+     * AJAX - Processa todos os duplicados em lote
+     */
+    public function ajax_process_all_duplicates() {
+        // Verifica nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'wc_custom_reviews_process_all')) {
+            wp_send_json_error(array('message' => __('Erro de segurança.', 'wc-custom-reviews')));
+        }
+        
+        // Verifica permissões
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('Sem permissão.', 'wc-custom-reviews')));
+        }
+        
+        $batch_size = isset($_POST['batch_size']) ? intval($_POST['batch_size']) : 5;
+        $filters = isset($_POST['filters']) ? $_POST['filters'] : array();
+        
+        // Sanitiza filtros
+        $filters = array(
+            'same_product' => isset($filters['same_product']) && $filters['same_product'] === 'true',
+            'same_name' => isset($filters['same_name']) && $filters['same_name'] === 'true',
+            'same_text' => isset($filters['same_text']) && $filters['same_text'] === 'true',
+        );
+        
+        $db = WC_Custom_Reviews_Database::get_instance();
+        
+        // Busca duplicados sempre do offset 0 (pois após excluir, a lista muda)
+        $duplicate_groups = $db->find_duplicate_reviews($batch_size, 0, $filters);
+        
+        $total_deleted = 0;
+        $processed = 0;
+        
+        foreach ($duplicate_groups as $group) {
+            $reviews = $group['reviews'];
+            
+            if (count($reviews) > 1) {
+                // Remove o primeiro (mais antigo) da lista
+                array_shift($reviews);
+                
+                // Exclui os demais
+                foreach ($reviews as $review) {
+                    if ($db->delete_review($review->id)) {
+                        $total_deleted++;
+                    }
+                }
+            }
+            
+            $processed++;
+        }
+        
+        wp_send_json_success(array(
+            'processed' => $processed,
+            'deleted' => $total_deleted,
+            'message' => sprintf(__('%d reviews excluídos.', 'wc-custom-reviews'), $total_deleted)
+        ));
+    }
+
+    /**
+     * Página de reviews duplicados
+     */
+    public function admin_page_duplicates() {
+        $db = WC_Custom_Reviews_Database::get_instance();
+        
+        // Paginação
+        $page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+        $per_page = 10; // Grupos por página
+        $offset = ($page - 1) * $per_page;
+        
+        // Filtros personalizados
+        $filters = array(
+            'same_product' => isset($_GET['same_product']) ? true : false,
+            'same_name' => isset($_GET['same_name']) ? true : false,
+            'same_text' => isset($_GET['same_text']) ? true : false,
+        );
+        
+        // Se nenhum filtro foi selecionado na primeira visita, ativa "mesmo texto" como padrão
+        if (!isset($_GET['same_product']) && !isset($_GET['same_name']) && !isset($_GET['same_text']) && !isset($_GET['paged'])) {
+            $filters['same_text'] = true;
+        }
+        
+        $duplicates = $db->find_duplicate_reviews($per_page, $offset, $filters);
+        $total_groups = $db->count_duplicate_groups($filters);
+        $total_pages = ceil($total_groups / $per_page);
+        
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Custom Reviews - Duplicados Detectados', 'wc-custom-reviews'); ?></h1>
+            
+            <!-- Filtros Personalizados -->
+            <div style="background: #fff; padding: 15px; margin: 20px 0; border: 1px solid #ddd; border-radius: 4px;">
+                <h3 style="margin-top: 0;"><?php _e('🔍 Filtros de Detecção', 'wc-custom-reviews'); ?></h3>
+                <form method="get" action="" style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                    <input type="hidden" name="page" value="wc-custom-reviews-duplicates">
+                    
+                    <label style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" name="same_product" value="1" <?php checked($filters['same_product']); ?>>
+                        <strong><?php _e('Mesmo Produto', 'wc-custom-reviews'); ?></strong>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" name="same_name" value="1" <?php checked($filters['same_name']); ?>>
+                        <strong><?php _e('Mesmo Nome', 'wc-custom-reviews'); ?></strong>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" name="same_text" value="1" <?php checked($filters['same_text']); ?>>
+                        <strong><?php _e('Mesmo Texto', 'wc-custom-reviews'); ?></strong>
+                    </label>
+                    
+                    <button type="submit" class="button button-primary"><?php _e('Aplicar Filtros', 'wc-custom-reviews'); ?></button>
+                    
+                    <?php if ($filters['same_product'] || $filters['same_name'] || !$filters['same_text']) : ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=wc-custom-reviews-duplicates&same_text=1')); ?>" class="button"><?php _e('Limpar Filtros', 'wc-custom-reviews'); ?></a>
+                    <?php endif; ?>
+                </form>
+                <p class="description" style="margin: 10px 0 0 0;">
+                    <?php _e('Selecione uma ou mais opções para definir o que considera duplicado. Exemplo: "Mesmo Produto + Mesmo Nome" encontra reviews do mesmo cliente no mesmo produto.', 'wc-custom-reviews'); ?>
+                </p>
+            </div>
+            
+            <?php if ($total_groups == 0) : ?>
+                <div class="notice notice-success">
+                    <p><?php _e('✅ Nenhum review duplicado encontrado! Seu banco de dados está limpo.', 'wc-custom-reviews'); ?></p>
+                </div>
+            <?php else : ?>
+                <div class="notice notice-warning">
+                    <p><?php printf(__('⚠️ Encontramos %d grupo(s) de reviews com texto idêntico. Revise abaixo:', 'wc-custom-reviews'), $total_groups); ?></p>
+                </div>
+                
+                <!-- Botão Global para Processar Todos -->
+                <div style="background: #fff; padding: 20px; margin: 20px 0; border: 2px solid #dc3232; border-radius: 4px;">
+                    <h3 style="margin-top: 0; color: #dc3232;">⚡ <?php _e('Ação Global', 'wc-custom-reviews'); ?></h3>
+                    <p><?php _e('Processe TODOS os grupos de duplicados de uma vez. Esta ação irá manter o review mais antigo de cada grupo e excluir todos os duplicados.', 'wc-custom-reviews'); ?></p>
+                    <button type="button" id="process-all-duplicates" class="button button-primary button-large" style="background: #dc3232; border-color: #dc3232;">
+                        <?php printf(__('Processar Todos os %d Grupos (Manter Antigos)', 'wc-custom-reviews'), $total_groups); ?>
+                    </button>
+                    <span id="processing-status" style="margin-left: 15px; font-weight: bold; display: none;"></span>
+                    <div id="progress-bar" style="display: none; margin-top: 15px; background: #f0f0f0; height: 30px; border-radius: 4px; overflow: hidden; position: relative;">
+                        <div id="progress-bar-fill" style="background: #46b450; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        <span id="progress-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; color: #333;">0%</span>
+                    </div>
+                </div>
+
+                <!-- Paginação Superior -->
+                <?php if ($total_pages > 1) : ?>
+                    <div class="tablenav top">
+                        <div class="tablenav-pages">
+                            <span class="displaying-num">
+                                <?php 
+                                printf(
+                                    _n('%s grupo', '%s grupos', $total_groups, 'wc-custom-reviews'), 
+                                    number_format_i18n($total_groups)
+                                ); 
+                                ?>
+                            </span>
+                            <?php
+                            $base_args = array('page' => 'wc-custom-reviews-duplicates');
+                            if ($filters['same_product']) {
+                                $base_args['same_product'] = '1';
+                            }
+                            if ($filters['same_name']) {
+                                $base_args['same_name'] = '1';
+                            }
+                            if ($filters['same_text']) {
+                                $base_args['same_text'] = '1';
+                            }
+                            
+                            $pagination_args = array(
+                                'base' => add_query_arg(array_merge($base_args, array('paged' => '%#%'))),
+                                'format' => '',
+                                'prev_text' => '&laquo;',
+                                'next_text' => '&raquo;',
+                                'total' => $total_pages,
+                                'current' => $page,
+                                'show_all' => false,
+                                'end_size' => 1,
+                                'mid_size' => 2,
+                                'type' => 'plain',
+                            );
+                            
+                            echo '<span class="pagination-links">';
+                            echo paginate_links($pagination_args);
+                            echo '</span>';
+                            ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <?php foreach ($duplicates as $index => $duplicate_group) : ?>
+                    <div style="background: #fff; padding: 20px; margin: 20px 0; border-left: 4px solid #f0ad4e; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <h3 style="margin-top: 0;">
+                            <?php echo esc_html($duplicate_group['reason']); ?>
+                            <span style="background: #f0ad4e; color: #fff; padding: 3px 8px; font-size: 12px; border-radius: 3px; margin-left: 10px;">TEXTO DUPLICADO</span>
+                        </h3>
+                        
+                        <!-- Ações em Massa para este grupo -->
+                        <div style="margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 4px;">
+                            <label style="margin-right: 15px;">
+                                <input type="checkbox" class="select-all-group" data-group="<?php echo $index; ?>">
+                                <strong><?php _e('Selecionar todos', 'wc-custom-reviews'); ?></strong>
+                            </label>
+                            <button type="button" class="button bulk-delete-group" data-group="<?php echo $index; ?>" style="margin-left: 10px;">
+                                <?php _e('Excluir Selecionados', 'wc-custom-reviews'); ?>
+                            </button>
+                            <button type="button" class="button button-link-delete keep-one-delete-rest" data-group="<?php echo $index; ?>" style="color: #dc3232;">
+                                <?php _e('Manter mais antigo e excluir os outros', 'wc-custom-reviews'); ?>
+                            </button>
+                        </div>
+
+                        <table class="wp-list-table widefat fixed striped" style="margin-top: 15px;">
+                            <thead>
+                                <tr>
+                                    <td class="check-column">
+                                        <input type="checkbox" class="group-select-all" data-group="<?php echo $index; ?>">
+                                    </td>
+                                    <th style="width: 60px;"><?php _e('ID', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Produto', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Cliente', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Email', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Avaliação', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Comentário', 'wc-custom-reviews'); ?></th>
+                                    <th><?php _e('Data', 'wc-custom-reviews'); ?></th>
+                                    <th style="width: 100px;"><?php _e('Ações', 'wc-custom-reviews'); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($duplicate_group['reviews'] as $review) : ?>
+                                    <tr id="review-<?php echo esc_attr($review->id); ?>" class="group-<?php echo $index; ?>-review">
+                                        <th scope="row" class="check-column">
+                                            <input type="checkbox" class="review-checkbox group-<?php echo $index; ?>-checkbox" value="<?php echo esc_attr($review->id); ?>">
+                                        </th>
+                                        <td><strong>#<?php echo esc_html($review->id); ?></strong></td>
+                                        <td>
+                                            <?php if ($review->product_name) : ?>
+                                                <a href="<?php echo get_edit_post_link($review->product_id); ?>" target="_blank">
+                                                    <?php echo esc_html($review->product_name); ?>
+                                                </a>
+                                            <?php else : ?>
+                                                <?php _e('Produto não encontrado', 'wc-custom-reviews'); ?>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><strong><?php echo esc_html($review->customer_name); ?></strong></td>
+                                        <td><?php echo esc_html($review->customer_email); ?></td>
+                                        <td>
+                                            <?php
+                                            for ($i = 1; $i <= 5; $i++) {
+                                                if ($i <= $review->rating) {
+                                                    echo '<span style="color: #ffb400;">★</span>';
+                                                } else {
+                                                    echo '<span style="color: #ddd;">★</span>';
+                                                }
+                                            }
+                                            ?>
+                                        </td>
+                                        <td>
+                                            <div style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;">
+                                                <?php echo esc_html(wp_trim_words($review->review_text, 15)); ?>
+                                            </div>
+                                        </td>
+                                        <td><?php echo date_i18n('d/m/Y H:i', strtotime($review->created_at)); ?></td>
+                                        <td>
+                                            <button type="button" 
+                                                    class="button button-small button-link-delete" 
+                                                    onclick="if(confirm('<?php _e('Tem certeza que deseja excluir este review?', 'wc-custom-reviews'); ?>')) { deleteReview(<?php echo esc_js($review->id); ?>); }"
+                                                    style="color: #b32d2e;">
+                                                <?php _e('Excluir', 'wc-custom-reviews'); ?>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php endforeach; ?>
+
+                <!-- Paginação Inferior -->
+                <?php if ($total_pages > 1) : ?>
+                    <div class="tablenav bottom">
+                        <div class="tablenav-pages">
+                            <?php
+                            echo '<span class="pagination-links">';
+                            echo paginate_links($pagination_args);
+                            echo '</span>';
+                            ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <div class="notice notice-info">
+                    <p>
+                        <strong><?php _e('💡 Dica:', 'wc-custom-reviews'); ?></strong>
+                        <?php _e('Estes são reviews com texto exatamente igual. Podem ser spam, cópias ou reviews legítimos similares. Revise cada caso individualmente.', 'wc-custom-reviews'); ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <script>
+        jQuery(document).ready(function($) {
+            // Botão para processar todos os duplicados
+            $('#process-all-duplicates').on('click', function() {
+                var filters = {
+                    same_product: <?php echo $filters['same_product'] ? 'true' : 'false'; ?>,
+                    same_name: <?php echo $filters['same_name'] ? 'true' : 'false'; ?>,
+                    same_text: <?php echo $filters['same_text'] ? 'true' : 'false'; ?>
+                };
+                
+                if (!confirm('ATENÇÃO: Isso irá processar TODOS os grupos de duplicados!\n\n' +
+                             'A ação irá manter o review MAIS ANTIGO de cada grupo e excluir os outros.\n\n' +
+                             'Esta ação NÃO PODE SER DESFEITA!\n\n' +
+                             'Deseja continuar?')) {
+                    return;
+                }
+                
+                $('#process-all-duplicates').prop('disabled', true).text('Processando...');
+                $('#processing-status').show().text('Iniciando processamento...');
+                $('#progress-bar').show();
+                
+                processAllDuplicates(0, 0, filters, 5); // Começa com 5%
+            });
+            
+            // Função recursiva para processar duplicados em lotes
+            function processAllDuplicates(processed, totalDeleted, filters, lastProgress) {
+                if (typeof lastProgress === 'undefined') {
+                    lastProgress = 0;
+                }
+                
+                var batchSize = 5; // Processa 5 grupos por vez
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'wc_custom_reviews_process_all_duplicates',
+                        batch_size: batchSize,
+                        filters: filters,
+                        nonce: '<?php echo wp_create_nonce('wc_custom_reviews_process_all'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            var batchProcessed = response.data.processed;
+                            var batchDeleted = response.data.deleted;
+                            
+                            processed += batchProcessed;
+                            totalDeleted += batchDeleted;
+                            
+                            // Atualiza barra de progresso gradualmente
+                            // Cada lote processado adiciona um pequeno incremento
+                            if (batchProcessed > 0) {
+                                // Incremento variável: quanto mais deletar, mais avança
+                                var increment = Math.min(5, 1 + (batchDeleted * 0.2));
+                                lastProgress = Math.min(95, lastProgress + increment);
+                            }
+                            
+                            $('#progress-bar-fill').css('width', lastProgress + '%');
+                            $('#progress-text').text(Math.round(lastProgress) + '%');
+                            $('#processing-status').text('Processados: ' + processed + ' grupos | Reviews excluídos: ' + totalDeleted);
+                            
+                            // Se ainda processou algo neste lote, continua
+                            if (batchProcessed > 0) {
+                                setTimeout(function() {
+                                    processAllDuplicates(processed, totalDeleted, filters, lastProgress);
+                                }, 500); // Pausa de 500ms entre lotes
+                            } else {
+                                // Concluído! Não há mais duplicados
+                                $('#progress-bar-fill').css({'background': '#46b450', 'width': '100%'});
+                                $('#progress-text').text('100%');
+                                $('#processing-status').text('✅ Processamento concluído! Total: ' + processed + ' grupos processados, ' + totalDeleted + ' reviews excluídos').css('color', '#46b450');
+                                $('#process-all-duplicates').text('✓ Concluído!');
+                                
+                                setTimeout(function() {
+                                    location.reload();
+                                }, 2000);
+                            }
+                        } else {
+                            $('#processing-status').text('❌ Erro: ' + response.data.message).css('color', '#dc3232');
+                            $('#process-all-duplicates').prop('disabled', false).text('Tentar Novamente');
+                        }
+                    },
+                    error: function() {
+                        $('#processing-status').text('❌ Erro na comunicação com o servidor').css('color', '#dc3232');
+                        $('#process-all-duplicates').prop('disabled', false).text('Tentar Novamente');
+                    }
+                });
+            }
+            
+            // Selecionar todos os checkboxes de um grupo
+            $('.select-all-group, .group-select-all').on('change', function() {
+                var group = $(this).data('group');
+                var isChecked = $(this).prop('checked');
+                $('.group-' + group + '-checkbox').prop('checked', isChecked);
+            });
+            
+            // Excluir reviews selecionados de um grupo
+            $('.bulk-delete-group').on('click', function() {
+                var group = $(this).data('group');
+                var reviewIds = [];
+                
+                $('.group-' + group + '-checkbox:checked').each(function() {
+                    reviewIds.push($(this).val());
+                });
+                
+                if (reviewIds.length === 0) {
+                    alert('<?php _e('Selecione pelo menos um review para excluir.', 'wc-custom-reviews'); ?>');
+                    return;
+                }
+                
+                if (!confirm('<?php _e('Tem certeza que deseja excluir', 'wc-custom-reviews'); ?> ' + reviewIds.length + ' <?php _e('review(s)?', 'wc-custom-reviews'); ?>')) {
+                    return;
+                }
+                
+                bulkDeleteReviews(reviewIds);
+            });
+            
+            // Manter o mais antigo e excluir os outros
+            $('.keep-one-delete-rest').on('click', function() {
+                var group = $(this).data('group');
+                var allReviewIds = [];
+                
+                $('.group-' + group + '-review').each(function() {
+                    var reviewId = $(this).find('.review-checkbox').val();
+                    allReviewIds.push(reviewId);
+                });
+                
+                if (allReviewIds.length <= 1) {
+                    alert('<?php _e('Não há reviews suficientes neste grupo.', 'wc-custom-reviews'); ?>');
+                    return;
+                }
+                
+                // Remove o primeiro (mais antigo) da lista
+                var reviewsToDelete = allReviewIds.slice(1);
+                
+                if (!confirm('<?php _e('Isso vai manter o review mais antigo e excluir', 'wc-custom-reviews'); ?> ' + reviewsToDelete.length + ' <?php _e('review(s) mais recente(s). Confirma?', 'wc-custom-reviews'); ?>')) {
+                    return;
+                }
+                
+                bulkDeleteReviews(reviewsToDelete);
+            });
+            
+            // Função para excluir múltiplos reviews
+            function bulkDeleteReviews(reviewIds) {
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'wc_custom_reviews_bulk_delete',
+                        review_ids: reviewIds,
+                        nonce: '<?php echo wp_create_nonce('wc_custom_reviews_bulk_action'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            reviewIds.forEach(function(id) {
+                                $('#review-' + id).fadeOut(300, function() {
+                                    $(this).remove();
+                                });
+                            });
+                            
+                            alert(response.data.message);
+                            
+                            // Recarrega a página após 1 segundo
+                            setTimeout(function() {
+                                location.reload();
+                            }, 1000);
+                        } else {
+                            alert('<?php _e('Erro ao excluir reviews.', 'wc-custom-reviews'); ?>');
+                        }
+                    },
+                    error: function() {
+                        alert('<?php _e('Erro na comunicação com o servidor.', 'wc-custom-reviews'); ?>');
+                    }
+                });
+            }
+        });
+        
+        // Função para excluir review individual (mantida para compatibilidade)
+        function deleteReview(reviewId) {
+            jQuery.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'wc_custom_reviews_delete_review',
+                    review_id: reviewId,
+                    nonce: '<?php echo wp_create_nonce('wc_custom_reviews_admin_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        jQuery('#review-' + reviewId).fadeOut(300, function() {
+                            jQuery(this).remove();
+                        });
+                        alert('<?php _e('Review excluído com sucesso!', 'wc-custom-reviews'); ?>');
+                        
+                        // Recarrega a página após 1 segundo para atualizar a lista
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1000);
+                    } else {
+                        alert('<?php _e('Erro ao excluir review.', 'wc-custom-reviews'); ?>');
+                    }
+                },
+                error: function() {
+                    alert('<?php _e('Erro na comunicação com o servidor.', 'wc-custom-reviews'); ?>');
+                }
+            });
+        }
+        </script>
+        <?php
     }
 }
 

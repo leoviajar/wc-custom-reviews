@@ -108,13 +108,15 @@ class WC_Custom_Reviews_Shortcodes {
         
         ob_start();
         ?>
-        <div class="wc-custom-reviews-stars" data-product-id="<?php echo esc_attr($product_id); ?>">
-            <div class="stars-display">
-                <?php echo $this->render_stars($average_rating); ?>
-                <span class="rating-average"><?php echo esc_html($average_rating); ?></span>
-                <span class="rating-count">(<?php echo esc_html($stats->total_reviews); ?>)</span>
+        <a href="#wc-custom-reviews-widget-<?php echo esc_attr($product_id); ?>" class="wc-custom-reviews-stars-link" style="text-decoration: none; color: inherit; display: inline-block;">
+            <div class="wc-custom-reviews-stars" data-product-id="<?php echo esc_attr($product_id); ?>" style="cursor: pointer;">
+                <div class="stars-display">
+                    <?php echo $this->render_stars($average_rating); ?>
+                    <span class="rating-average"><?php echo esc_html($average_rating); ?></span>
+                    <span class="rating-count">(<?php echo esc_html($stats->total_reviews); ?>)</span>
+                </div>
             </div>
-        </div>
+        </a>
         <?php
         return ob_get_clean();
     }
@@ -124,6 +126,9 @@ class WC_Custom_Reviews_Shortcodes {
      * CORRIGIDO: Lógica simplificada para usar configuração do admin
      */
     public function ajax_load_reviews() {
+        // DEBUG: Log dos dados recebidos
+        error_log('[AJAX LOAD REVIEWS] POST data: ' . print_r($_POST, true));
+        
         check_ajax_referer("wc_custom_reviews_frontend_nonce", "nonce");
 
         $product_id = isset($_POST["product_id"]) ? intval($_POST["product_id"]) : 0;
@@ -139,7 +144,11 @@ class WC_Custom_Reviews_Shortcodes {
         $options = get_option("wc_custom_reviews_options");
         $review_order = isset($options["review_order"]) ? $options["review_order"] : "recent";
 
+        // DEBUG: Log das variáveis processadas
+        error_log('[AJAX LOAD REVIEWS] product_id: ' . $product_id . ', page: ' . $page . ', reviews_per_page: ' . $reviews_per_page);
+
         if (empty($product_id) || $page < 1 || $reviews_per_page < 1) {
+            error_log('[AJAX LOAD REVIEWS] ERRO - Validação falhou: product_id=' . $product_id . ', page=' . $page . ', reviews_per_page=' . $reviews_per_page);
             wp_send_json_error(array("message" => __("Dados inválidos para carregar avaliações.", "wc-custom-reviews")));
         }
 
@@ -154,10 +163,74 @@ class WC_Custom_Reviews_Shortcodes {
         if (!empty($reviews)) : 
             foreach ($reviews as $review) : 
                 ?>
-                <div class="review-grid-item" data-review-id="<?php echo esc_attr($review->id); ?>">
-                    <?php if (!empty($review->image_url)) : ?>
+                <?php
+                // Decodifica as imagens do JSON
+                $image_urls = !empty($review->image_url) ? json_decode($review->image_url, true) : array();
+                $video_url = !empty($review->video_url) ? $review->video_url : null;
+                
+                // Conta total de mídias (imagens + vídeo)
+                $total_media = 0;
+                if (is_array($image_urls) && !empty($image_urls)) {
+                    $total_media += count($image_urls);
+                }
+                if (!empty($video_url)) {
+                    $total_media += 1;
+                }
+                ?>
+                <div class="review-grid-item" data-review-id="<?php echo esc_attr($review->id); ?>" data-media-count="<?php echo esc_attr($total_media); ?>">
+                    <?php 
+                    // Prioriza vídeo, senão mostra primeira imagem
+                    if (!empty($video_url)) : 
+                        // Adiciona #t=0.1 para forçar thumbnail
+                        $video_url_with_time = add_query_arg('t', '0.1', $video_url);
+                        if (strpos($video_url, '?') !== false) {
+                            $video_url_with_time = $video_url . '#t=0.1';
+                        } else {
+                            $video_url_with_time = $video_url . '#t=0.1';
+                        }
+                    ?>
+                        <div class="review-image-grid review-video-grid">
+                            <video src="<?php echo esc_url($video_url_with_time); ?>" muted preload="metadata"></video>
+                            <div class="play-icon-overlay"><i class="fa-solid fa-play"></i></div>
+                            <?php if ($total_media > 1) : ?>
+                                <div class="images-counter">
+                                    <?php echo esc_html($total_media); ?>
+                                    <?php if ($total_media == 2) : ?>
+                                        <div class="images-counter"><?php echo esc_html($total_media); ?></div>
+                                    <?php elseif ($total_media >= 3) : ?>
+                                        <div class="images-counter">
+                                            <?php echo esc_html($total_media); ?>
+                                            <div class="images-counter"><?php echo esc_html($total_media); ?></div>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php elseif (!empty($image_urls) && is_array($image_urls)) : 
+                    ?>
                         <div class="review-image-grid">
-                            <img src="<?php echo esc_url($review->image_url); ?>" alt="<?php echo esc_attr__("Imagem da Avaliação", "wc-custom-reviews"); ?>">
+                            <img src="<?php echo esc_url($image_urls[0]); ?>" 
+                                 alt="<?php echo esc_attr__('Imagem da Avaliação', 'wc-custom-reviews'); ?>">
+                            <?php if ($total_media > 1) : ?>
+                                <div class="images-counter">
+                                    <?php echo esc_html($total_media); ?>
+                                    <?php if ($total_media == 2) : ?>
+                                        <div class="images-counter"><?php echo esc_html($total_media); ?></div>
+                                    <?php elseif ($total_media >= 3) : ?>
+                                        <div class="images-counter">
+                                            <?php echo esc_html($total_media); ?>
+                                            <div class="images-counter"><?php echo esc_html($total_media); ?></div>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    <?php elseif (!empty($review->image_url) && !is_array($image_urls)) : 
+                        // Fallback para reviews antigas com apenas uma imagem (string ao invés de JSON)
+                    ?>
+                        <div class="review-image-grid">
+                            <img src="<?php echo esc_url($review->image_url); ?>" 
+                                 alt="<?php echo esc_attr__('Imagem da Avaliação', 'wc-custom-reviews'); ?>">
                         </div>
                     <?php endif; ?>
                     <div class="review-grid-content">
@@ -237,7 +310,7 @@ class WC_Custom_Reviews_Shortcodes {
 
         ob_start();
         ?>
-        <div class="wc-custom-reviews-widget" data-product-id="<?php echo esc_attr($product_id); ?>" data-review-order="<?php echo esc_attr($review_order); ?>">
+        <div id="wc-custom-reviews-widget-<?php echo esc_attr($product_id); ?>" class="wc-custom-reviews-widget" data-product-id="<?php echo esc_attr($product_id); ?>" data-review-order="<?php echo esc_attr($review_order); ?>">
             
             <!-- Resumo das avaliações -->
             <div class="reviews-summary">
@@ -299,9 +372,22 @@ class WC_Custom_Reviews_Shortcodes {
                 <div class="wc-custom-reviews-grid">     
                     <?php foreach ($reviews as $review) : ?>
                         <div class="review-grid-item" data-review-id="<?php echo esc_attr($review->id); ?>">
-                            <?php if (!empty($review->image_url)) : ?>
+                            <?php 
+                            // Decodifica as imagens do JSON
+                            $image_urls = !empty($review->image_url) ? json_decode($review->image_url, true) : array();
+                            
+                            if (!empty($image_urls) && is_array($image_urls)) : 
+                            ?>
                                 <div class="review-image-grid">
-                                    <img src="<?php echo esc_url($review->image_url); ?>" alt="<?php echo esc_attr__("Imagem da Avaliação", "wc-custom-reviews"); ?>">
+                                    <img src="<?php echo esc_url($image_urls[0]); ?>" 
+                                         alt="<?php echo esc_attr__('Imagem da Avaliação', 'wc-custom-reviews'); ?>">
+                                </div>
+                            <?php elseif (!empty($review->image_url) && !is_array($image_urls)) : 
+                                // Fallback para reviews antigas com apenas uma imagem (string ao invés de JSON)
+                            ?>
+                                <div class="review-image-grid">
+                                    <img src="<?php echo esc_url($review->image_url); ?>" 
+                                         alt="<?php echo esc_attr__('Imagem da Avaliação', 'wc-custom-reviews'); ?>">
                                 </div>
                             <?php endif; ?>
                             <div class="review-grid-content">
@@ -408,13 +494,12 @@ class WC_Custom_Reviews_Shortcodes {
                             if ($enable_photos) :
                             ?>
                             <div class="form-row">
-                                <label for="review_image"><?php _e('Adicionar Foto (opcional)', 'wc-custom-reviews'); ?></label>
-                                <input type="file" id="review_image" name="review_image" accept="image/*">
-                                <p class="description"><?php _e('Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 2MB', 'wc-custom-reviews'); ?></p>
+                                <label for="review_images"><?php _e('Adicionar Fotos e Vídeos (opcional)', 'wc-custom-reviews'); ?></label>
+                                <input type="file" id="review_images" name="review_images[]" accept="image/*,video/*" multiple>
+                                <p class="description"><?php _e('Você pode adicionar até 10 fotos/vídeos. Imagens: JPG, PNG, GIF. Vídeos: MP4, WEBM. Tamanho máximo: 2MB por imagem, 50MB por vídeo', 'wc-custom-reviews'); ?></p>
                                 
-                                <div class="image-preview-container" style="display: none;">
-                                    <img id="review-image-preview" src="" alt="Preview" style="max-width: 200px; max-height: 200px;">
-                                    <button type="button" id="remove-image-preview"><?php _e('Remover', 'wc-custom-reviews'); ?></button>
+                                <div class="images-preview-container" style="display: none;">
+                                    <div id="review-images-preview" class="review-images-preview-grid"></div>
                                 </div>
                             </div>
                             <?php endif; ?>

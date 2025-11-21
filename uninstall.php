@@ -9,6 +9,10 @@ if (!defined('WP_UNINSTALL_PLUGIN')) {
     exit;
 }
 
+// IMPORTANTE: Código comentado intencionalmente para preservar dados em produção
+// Descomente as linhas abaixo APENAS se quiser remover TODOS os dados ao desinstalar o plugin
+// ATENÇÃO: Esta ação é irreversível e todos os reviews serão perdidos permanentemente
+
 // Remove opções do plugin
 // delete_option('wc_custom_reviews_options');
 // delete_option('wc_custom_reviews_db_version');

@@ -39,16 +39,39 @@ class WC_Custom_Reviews_Database {
         $this->update_table_structure();
     }
 
-    public function get_total_all_reviews($status = "") {
+    public function get_total_all_reviews($status = "", $search = "") {
         global $wpdb;
 
-        $where_clause = "";
+        $search = sanitize_text_field($search);
+        $where_conditions = array();
+        
+        // Filtro por status
         if (!empty($status)) {
             $status = sanitize_text_field($status);
-            $where_clause = $wpdb->prepare("WHERE status = %s", $status);
+            $where_conditions[] = $wpdb->prepare("r.status = %s", $status);
+        }
+        
+        // Filtro por busca
+        if (!empty($search)) {
+            $search_like = '%' . $wpdb->esc_like($search) . '%';
+            $where_conditions[] = $wpdb->prepare(
+                "(r.customer_name LIKE %s OR r.customer_email LIKE %s OR r.review_text LIKE %s OR p.post_title LIKE %s)",
+                $search_like,
+                $search_like,
+                $search_like,
+                $search_like
+            );
+        }
+        
+        // Monta cláusula WHERE
+        $where_clause = '';
+        if (!empty($where_conditions)) {
+            $where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
         }
 
-        $sql = "SELECT COUNT(*) FROM {$this->table_name} $where_clause";
+        $sql = "SELECT COUNT(*) FROM {$this->table_name} r 
+                LEFT JOIN {$wpdb->posts} p ON r.product_id = p.ID 
+                $where_clause";
 
         return $wpdb->get_var($sql);
     }
@@ -90,7 +113,8 @@ class WC_Custom_Reviews_Database {
             status varchar(20) DEFAULT 'pendente',
             created_at datetime DEFAULT CURRENT_TIMESTAMP,
             updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            image_url varchar(500) DEFAULT NULL,
+            image_url TEXT DEFAULT NULL,
+            video_url VARCHAR(500) DEFAULT NULL,
             PRIMARY KEY (id),
             KEY product_id (product_id),
             KEY status (status),
@@ -118,9 +142,30 @@ class WC_Custom_Reviews_Database {
             'image_url'
         ));
         
-        // Se não existe, adiciona a coluna
+        // Se não existe, adiciona a coluna como TEXT para suportar múltiplas URLs
         if (empty($column_exists)) {
-            $wpdb->query("ALTER TABLE $table_name ADD COLUMN image_url varchar(500) DEFAULT NULL AFTER updated_at");
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN image_url TEXT DEFAULT NULL AFTER updated_at");
+        } else {
+            // Se existe mas é VARCHAR, converte para TEXT
+            $column_info = $wpdb->get_row($wpdb->prepare(
+                "SHOW COLUMNS FROM $table_name LIKE %s",
+                'image_url'
+            ));
+            
+            if ($column_info && strpos($column_info->Type, 'varchar') !== false) {
+                $wpdb->query("ALTER TABLE $table_name MODIFY COLUMN image_url TEXT DEFAULT NULL");
+            }
+        }
+        
+        // Verifica se a coluna video_url existe
+        $video_column_exists = $wpdb->get_results($wpdb->prepare(
+            "SHOW COLUMNS FROM $table_name LIKE %s",
+            'video_url'
+        ));
+        
+        // Se não existe, adiciona a coluna para vídeos
+        if (empty($video_column_exists)) {
+            $wpdb->query("ALTER TABLE $table_name ADD COLUMN video_url VARCHAR(500) DEFAULT NULL AFTER image_url");
         }
     }
 
@@ -148,7 +193,8 @@ class WC_Custom_Reviews_Database {
         
         // Executa a exclusão
         $sql = "DELETE FROM {$this->table_name} WHERE id IN ($placeholders)";
-        $result = $wpdb->query($wpdb->prepare($sql, $review_ids));
+        $prepared_sql = $wpdb->prepare($sql, $review_ids);
+        $result = $wpdb->query($prepared_sql);
         
         return $result !== false ? $result : 0;
     }
@@ -255,17 +301,38 @@ class WC_Custom_Reviews_Database {
     /**
      * Obtém todos os reviews para admin
      */
-    public function get_all_reviews($status = "", $limit = 20, $offset = 0, $order_by = 'recent') {
+    public function get_all_reviews($status = "", $limit = 20, $offset = 0, $order_by = 'recent', $search = '') {
         global $wpdb;
 
         $limit = absint($limit);
         $offset = absint($offset);
         $order_by = sanitize_text_field($order_by);
+        $search = sanitize_text_field($search);
 
-        $where_clause = '';
+        $where_conditions = array();
+        
+        // Filtro por status
         if (!empty($status)) {
             $status = sanitize_text_field($status);
-            $where_clause = $wpdb->prepare("WHERE r.status = %s", $status);
+            $where_conditions[] = $wpdb->prepare("r.status = %s", $status);
+        }
+        
+        // Filtro por busca (nome, email, comentário ou produto)
+        if (!empty($search)) {
+            $search_like = '%' . $wpdb->esc_like($search) . '%';
+            $where_conditions[] = $wpdb->prepare(
+                "(r.customer_name LIKE %s OR r.customer_email LIKE %s OR r.review_text LIKE %s OR p.post_title LIKE %s)",
+                $search_like,
+                $search_like,
+                $search_like,
+                $search_like
+            );
+        }
+        
+        // Monta cláusula WHERE
+        $where_clause = '';
+        if (!empty($where_conditions)) {
+            $where_clause = 'WHERE ' . implode(' AND ', $where_conditions);
         }
 
         // Define a cláusula ORDER BY baseada no parâmetro
@@ -358,6 +425,143 @@ class WC_Custom_Reviews_Database {
      */
     public function get_table_name() {
         return $this->table_name;
+    }
+
+    /**
+     * Detecta reviews duplicados ou suspeitos
+     * Retorna grupos de reviews que podem ser duplicados
+     */
+    public function find_duplicate_reviews($limit = 20, $offset = 0, $filters = array()) {
+        global $wpdb;
+
+        $duplicates = array();
+        $limit = absint($limit);
+        $offset = absint($offset);
+        
+        // Define critérios de agrupamento baseado nos filtros
+        $group_by = array();
+        $group_labels = array();
+        
+        if (isset($filters['same_product']) && $filters['same_product']) {
+            $group_by[] = 'product_id';
+            $group_labels[] = __('mesmo produto', 'wc-custom-reviews');
+        }
+        
+        if (isset($filters['same_name']) && $filters['same_name']) {
+            $group_by[] = 'customer_name';
+            $group_labels[] = __('mesmo nome', 'wc-custom-reviews');
+        }
+        
+        if (isset($filters['same_text']) && $filters['same_text']) {
+            $group_by[] = 'review_text';
+            $group_labels[] = __('mesmo texto', 'wc-custom-reviews');
+        }
+        
+        // Se nenhum filtro foi selecionado, usa padrão (apenas texto)
+        if (empty($group_by)) {
+            $group_by[] = 'review_text';
+            $group_labels[] = __('mesmo texto', 'wc-custom-reviews');
+        }
+        
+        $group_by_clause = implode(', ', $group_by);
+        $reason_label = ucfirst(implode(' + ', $group_labels));
+
+        // Busca duplicados baseado nos critérios
+        $select_fields = implode(', ', $group_by);
+        $similar_reviews = $wpdb->get_results($wpdb->prepare("
+            SELECT {$select_fields}, COUNT(*) as count
+            FROM {$this->table_name}
+            WHERE review_text != '' AND CHAR_LENGTH(review_text) > 10
+            GROUP BY {$group_by_clause}
+            HAVING count > 1
+            ORDER BY count DESC
+            LIMIT %d OFFSET %d
+        ", $limit, $offset));
+
+        if (!empty($similar_reviews)) {
+            foreach ($similar_reviews as $sim) {
+                // Constrói WHERE clause para buscar o grupo
+                $where_conditions = array();
+                $where_values = array();
+                
+                if (in_array('product_id', $group_by)) {
+                    $where_conditions[] = 'r.product_id = %d';
+                    $where_values[] = $sim->product_id;
+                }
+                
+                if (in_array('customer_name', $group_by)) {
+                    $where_conditions[] = 'r.customer_name = %s';
+                    $where_values[] = $sim->customer_name;
+                }
+                
+                if (in_array('review_text', $group_by)) {
+                    $where_conditions[] = 'r.review_text = %s';
+                    $where_values[] = $sim->review_text;
+                }
+                
+                $where_clause = implode(' AND ', $where_conditions);
+                
+                $sql = "SELECT r.*, p.post_title as product_name
+                        FROM {$this->table_name} r
+                        LEFT JOIN {$wpdb->posts} p ON r.product_id = p.ID
+                        WHERE {$where_clause}
+                        ORDER BY r.created_at DESC";
+                
+                $group_reviews = $wpdb->get_results($wpdb->prepare($sql, $where_values));
+
+                if (count($group_reviews) > 1) {
+                    $duplicates[] = array(
+                        'type' => 'filtered',
+                        'reason' => sprintf(__('%s (%d ocorrências)', 'wc-custom-reviews'), $reason_label, $sim->count),
+                        'count' => $sim->count,
+                        'reviews' => $group_reviews
+                    );
+                }
+            }
+        }
+
+        return $duplicates;
+    }
+
+    /**
+     * Conta total de grupos de reviews duplicados
+     */
+    public function count_duplicate_groups($filters = array()) {
+        global $wpdb;
+        
+        // Define critérios de agrupamento baseado nos filtros
+        $group_by = array();
+        
+        if (isset($filters['same_product']) && $filters['same_product']) {
+            $group_by[] = 'product_id';
+        }
+        
+        if (isset($filters['same_name']) && $filters['same_name']) {
+            $group_by[] = 'customer_name';
+        }
+        
+        if (isset($filters['same_text']) && $filters['same_text']) {
+            $group_by[] = 'review_text';
+        }
+        
+        // Se nenhum filtro foi selecionado, usa padrão (apenas texto)
+        if (empty($group_by)) {
+            $group_by[] = 'review_text';
+        }
+        
+        $group_by_clause = implode(', ', $group_by);
+
+        $result = $wpdb->get_var("
+            SELECT COUNT(*) FROM (
+                SELECT {$group_by_clause}
+                FROM {$this->table_name}
+                WHERE review_text != '' AND CHAR_LENGTH(review_text) > 10
+                GROUP BY {$group_by_clause}
+                HAVING COUNT(*) > 1
+            ) as duplicates
+        ");
+
+        return $result ? $result : 0;
     }
     
 }
