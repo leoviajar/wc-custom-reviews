@@ -10,7 +10,6 @@
 
     // Inicializa quando o DOM estiver pronto
     $(document).ready(function() {
-        console.log('[INIT] DOM Ready - Iniciando plugin WC Custom Reviews');
         
         initReviewForm();
         initRatingInput();
@@ -27,30 +26,76 @@
             var productId = $widget.data('product-id');
             var reviewsPerPage = parseInt($widget.find('.wc-custom-reviews-pagination').data('reviews-per-page')) || 10;
             var reviewOrder = $widget.data('review-order') || 'recent';
-            console.log('[INIT] Carregando reviews para produto:', productId, 'reviews_per_page:', reviewsPerPage);
             loadReviews(productId, 1, reviewsPerPage, reviewOrder, $widget);
         });
 
         $(".wc-custom-reviews-grid").each(function() {
             var grid = this;
-            console.log('[INIT] Inicializando Masonry no grid');
-            var msnry = new Masonry(grid, {
-                itemSelector: ".review-grid-item",
-                gutter: 15,
-                percentPosition: true
+            
+            // Adiciona classe 'no-media' aos cards sem imagens ou vídeos
+            $(grid).find('.review-grid-item').each(function() {
+                var $card = $(this);
+                var hasMedia = $card.find('img, video').length > 0;
+                if (!hasMedia) {
+                    $card.addClass('no-media');
+                }
             });
-
-            imagesLoaded(grid).on("progress", function() {
-                msnry.layout();
-            });
+            
+            // Conta imagens e vídeos
+            var $images = $(grid).find('img');
+            var $videos = $(grid).find('video');
+            var totalMedia = $images.length + $videos.length;
+            var loadedMedia = 0;
+            
+            
+            function checkAndInitMasonry() {
+                loadedMedia++;
+                
+                if (loadedMedia >= totalMedia) {
+                    
+                    var msnry = new Masonry(grid, {
+                        itemSelector: ".review-grid-item",
+                        gutter: 15,
+                        percentPosition: true
+                    });
+                    
+                }
+            }
+            
+            // Espera imagens carregarem
+            if ($images.length > 0) {
+                imagesLoaded(grid, { background: true }).on("always", function(instance) {
+                    loadedMedia += instance.images.length;
+                    checkAndInitMasonry();
+                });
+            }
+            
+            // Espera vídeos carregarem
+            if ($videos.length > 0) {
+                $videos.each(function() {
+                    var video = this;
+                    $(video).on('loadeddata', function() {
+                        checkAndInitMasonry();
+                    });
+                    // Força load
+                    video.load();
+                });
+            }
+            
+            // Se não houver mídias, inicializa direto
+            if (totalMedia === 0) {
+                new Masonry(grid, {
+                    itemSelector: ".review-grid-item",
+                    gutter: 15,
+                    percentPosition: true
+                });
+            }
         });
         
         // NOVO: Verifica se já existem vídeos renderizados na página inicial
         setTimeout(function() {
             var videosNaPagina = $('.review-video-grid video').length;
-            console.log('[INIT] Verificando vídeos após 500ms - Total encontrado:', videosNaPagina);
             if (videosNaPagina > 0) {
-                console.log('[INIT] Vídeos encontrados! Chamando initVideoThumbnails()');
                 initVideoThumbnails();
             }
         }, 500);
@@ -458,7 +503,6 @@
      * (o scroll agora é feito no clique do botão, antes do AJAX)
      */
     function loadReviews(productId, page, reviewsPerPage, reviewOrder, $widget) {
-        console.log('[LOAD REVIEWS] Iniciando loadReviews - produto:', productId, 'página:', page);
         
         // CORREÇÃO: Garante que reviews_per_page seja um número válido
         reviewsPerPage = parseInt(reviewsPerPage) || 10;
@@ -476,32 +520,24 @@
             review_order: reviewOrder
         };
         
-        console.log('[LOAD REVIEWS] Dados AJAX sendo enviados:', ajaxData);
-        console.log('[LOAD REVIEWS] Tipo de product_id:', typeof productId, '- Valor:', productId);
-        console.log('[LOAD REVIEWS] wcCustomReviews.nonce:', wcCustomReviews.nonce);
         
         $.ajax({
             url: wcCustomReviews.ajax_url,
             type: "POST",
             data: ajaxData,
             beforeSend: function() {
-                console.log('[LOAD REVIEWS] AJAX beforeSend');
                 $("#reviews-loader").show();
                 $reviewsList.css("opacity", "0.5");
             },
             success: function(response) {
-                console.log('[LOAD REVIEWS] AJAX success - response:', response);
                 if (response.success && response.data.reviews_html) {
-                    console.log('[LOAD REVIEWS] Reviews HTML recebido, tamanho:', response.data.reviews_html.length);
                     $reviewsList.html(response.data.reviews_html);
                     
                     // DEBUG: Verifica contadores de imagens
-                    console.log('[DEBUG] Verificando contadores de imagens nos cards:');
                     $('.review-grid-item').each(function(index) {
                         var $item = $(this);
                         var reviewId = $item.data('review-id');
                         var counter = $item.find('.images-counter').text();
-                        console.log('  Card #' + index + ' - Review ID:', reviewId, '- Contador:', counter || 'SEM CONTADOR');
                     });
                     
                     // Atualiza os botões de paginação com a lógica aprimorada
@@ -545,24 +581,74 @@
                     // Re-inicializa Masonry após carregar novos itens
                     var grid = $reviewsList[0];
                     if (grid) {
+                        
+                        // Adiciona classe 'no-media' aos cards sem imagens ou vídeos
+                        $(grid).find('.review-grid-item').each(function() {
+                            var $card = $(this);
+                            var hasMedia = $card.find('img, video').length > 0;
+                            if (!hasMedia) {
+                                $card.addClass('no-media');
+                            }
+                        });
+                        
                         var msnry = Masonry.data(grid);
                         if (msnry) {
                             msnry.destroy();
                         }
-                        msnry = new Masonry(grid, {
-                            itemSelector: ".review-grid-item",
-                            gutter: 15,
-                            percentPosition: true
-                        });
-                        imagesLoaded(grid).on("progress", function() {
-                            msnry.layout();
-                        });
+                        
+                        // Conta imagens e vídeos
+                        var $images = $(grid).find('img');
+                        var $videos = $(grid).find('video');
+                        var totalMedia = $images.length + $videos.length;
+                        var loadedMedia = 0;
+                        
+                        
+                        function checkAndInitMasonryAjax() {
+                            loadedMedia++;
+                            
+                            if (loadedMedia >= totalMedia) {
+                                
+                                msnry = new Masonry(grid, {
+                                    itemSelector: ".review-grid-item",
+                                    gutter: 15,
+                                    percentPosition: true
+                                });
+                                
+                            }
+                        }
+                        
+                        // Espera imagens carregarem
+                        if ($images.length > 0) {
+                            imagesLoaded(grid, { background: true }).on("always", function(instance) {
+                                loadedMedia += instance.images.length;
+                                checkAndInitMasonryAjax();
+                            });
+                        }
+                        
+                        // Espera vídeos carregarem
+                        if ($videos.length > 0) {
+                            $videos.each(function() {
+                                var video = this;
+                                $(video).on('loadeddata', function() {
+                                    checkAndInitMasonryAjax();
+                                });
+                                // Força load
+                                video.load();
+                            });
+                        }
+                        
+                        // Se não houver mídias, inicializa direto
+                        if (totalMedia === 0) {
+                            new Masonry(grid, {
+                                itemSelector: ".review-grid-item",
+                                gutter: 15,
+                                percentPosition: true
+                            });
+                        }
                     }
                     
                     // Força carregamento de thumbnails de vídeos carregados via AJAX
-                    console.log('[AJAX LOAD] Aguardando renderização completa...');
                     setTimeout(function() {
-                        console.log('[AJAX LOAD] Chamando initVideoThumbnails() após AJAX');
                         initVideoThumbnails();
                     }, 100);
 
@@ -578,7 +664,6 @@
                 showMessage($widget.find(".form-messages"), "error", wcCustomReviews.strings.error);
             },
             complete: function() {
-                console.log('[LOAD REVIEWS] AJAX complete');
                 setTimeout(function() {
                     $("#reviews-loader").hide();
                     $reviewsList.css("opacity", "1");
@@ -592,8 +677,14 @@
 
         // Adiciona a lógica para abrir o modal de review detalhado
     $(document).on("click", ".review-grid-item", function() {
-        var reviewId = $(this).data("review-id");
-        if (reviewId) {
+        var $card = $(this);
+        var reviewId = $card.data("review-id");
+        
+        // Verifica se o card tem imagens ou vídeos
+        var hasMedia = $card.find('img, video').length > 0;
+        
+        // Só abre o modal se tiver mídia
+        if (reviewId && hasMedia) {
             loadSingleReview(reviewId);
         }
     });
@@ -676,7 +767,6 @@
                         if ($mainVideo.length > 0) {
                             var videoElement = $mainVideo[0];
                             videoElement.play().catch(function(error) {
-                                console.log('Autoplay bloqueado pelo navegador:', error);
                             });
                         }
                     }, 400); // Aguarda modal aparecer completamente
@@ -769,7 +859,6 @@
                     var videoElement = $mainContainer.find('video')[0];
                     if (videoElement) {
                         videoElement.play().catch(function(error) {
-                            console.log('Autoplay bloqueado:', error);
                         });
                     }
                 }, 100);
@@ -813,7 +902,6 @@
                     var videoElement = $mainContainer.find('video')[0];
                     if (videoElement) {
                         videoElement.play().catch(function(error) {
-                            console.log('Autoplay bloqueado:', error);
                         });
                     }
                 }, 100);
@@ -847,112 +935,21 @@
      * Força o carregamento de thumbnails de vídeos
      */
     function initVideoThumbnails() {
-        console.log('[VIDEO THUMBNAILS] Iniciando função initVideoThumbnails');
-        
         // Força o carregamento dos vídeos nos cards
         var videos = $('.review-video-grid video, .modal-thumb video');
-        console.log('[VIDEO THUMBNAILS] Total de vídeos encontrados:', videos.length);
         
-        videos.each(function(index) {
+        videos.each(function() {
             var video = this;
-            console.log('[VIDEO THUMBNAILS] Processando vídeo ' + (index + 1) + ':', {
-                src: video.src,
-                readyState: video.readyState,
-                currentTime: video.currentTime,
-                duration: video.duration
-            });
             
             // Define tempo para 0.1s
-            try {
-                video.currentTime = 0.1;
-                console.log('[VIDEO THUMBNAILS] currentTime definido para 0.1s no vídeo ' + (index + 1));
-            } catch(e) {
-                console.error('[VIDEO THUMBNAILS] Erro ao definir currentTime:', e);
-            }
-            
-            // Força load
+            video.currentTime = 0.1;
             video.load();
-            console.log('[VIDEO THUMBNAILS] load() chamado no vídeo ' + (index + 1));
             
             // Quando metadados carregarem, renderiza o frame
-            $(video).on('loadedmetadata', function() {
-                console.log('[VIDEO THUMBNAILS] Event loadedmetadata disparado no vídeo ' + (index + 1), {
-                    duration: video.duration,
-                    readyState: video.readyState
-                });
+            $(video).on('loadedmetadata loadeddata', function() {
                 video.currentTime = 0.1;
             });
-            
-            $(video).on('loadeddata', function() {
-                console.log('[VIDEO THUMBNAILS] Event loadeddata disparado no vídeo ' + (index + 1), {
-                    currentTime: video.currentTime,
-                    readyState: video.readyState
-                });
-                video.currentTime = 0.1;
-            });
-            
-            $(video).on('canplay', function() {
-                console.log('[VIDEO THUMBNAILS] Event canplay disparado no vídeo ' + (index + 1));
-            });
-            
-            $(video).on('error', function(e) {
-                console.error('[VIDEO THUMBNAILS] Erro ao carregar vídeo ' + (index + 1) + ':', e, video.error);
-            });
-            
-            // Fallback: tenta novamente após 500ms
-            setTimeout(function() {
-                console.log('[VIDEO THUMBNAILS] Fallback 500ms - vídeo ' + (index + 1), {
-                    readyState: video.readyState,
-                    currentTime: video.currentTime
-                });
-                if (video.readyState >= 2) {
-                    video.currentTime = 0.1;
-                    console.log('[VIDEO THUMBNAILS] currentTime ajustado para 0.1s no fallback');
-                }
-            }, 500);
-            
-            // Fallback 2: tenta após 1s
-            setTimeout(function() {
-                console.log('[VIDEO THUMBNAILS] Fallback 1000ms - vídeo ' + (index + 1), {
-                    readyState: video.readyState,
-                    currentTime: video.currentTime,
-                    paused: video.paused
-                });
-                if (video.readyState >= 2) {
-                    video.currentTime = 0.1;
-                }
-            }, 1000);
         });
-        
-        // Observer para vídeos carregados dinamicamente
-        var observer = new MutationObserver(function(mutations) {
-            console.log('[VIDEO THUMBNAILS] MutationObserver disparado');
-            mutations.forEach(function(mutation) {
-                if (mutation.addedNodes.length) {
-                    console.log('[VIDEO THUMBNAILS] Nós adicionados detectados:', mutation.addedNodes.length);
-                    $(mutation.addedNodes).find('video').each(function(index) {
-                        var video = this;
-                        console.log('[VIDEO THUMBNAILS] Novo vídeo dinâmico encontrado:', video.src);
-                        video.currentTime = 0.1;
-                        video.load();
-                        
-                        $(video).on('loadedmetadata loadeddata', function() {
-                            console.log('[VIDEO THUMBNAILS] Metadados carregados para vídeo dinâmico');
-                            video.currentTime = 0.1;
-                        });
-                    });
-                }
-            });
-        });
-        
-        // Observa mudanças no grid de reviews
-        var grid = document.querySelector('.wc-custom-reviews-grid');
-        if (grid) {
-            console.log('[VIDEO THUMBNAILS] MutationObserver iniciado no grid');
-            observer.observe(grid, { childList: true, subtree: true });
-        } else {
-            console.warn('[VIDEO THUMBNAILS] Grid .wc-custom-reviews-grid não encontrado');
-        }
     }
 
 
