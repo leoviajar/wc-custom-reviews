@@ -212,7 +212,8 @@ class WC_Custom_Reviews_Database {
             'rating' => 5,
             'review_text' => '',
             'status' => 'pendente',
-            'image_url' => null
+            'image_url' => null,
+            'video_url' => null
         );
 
         $data = wp_parse_args($data, $defaults);
@@ -228,7 +229,23 @@ class WC_Custom_Reviews_Database {
         $data['rating'] = absint($data['rating']);
         $data['review_text'] = sanitize_textarea_field($data['review_text']);
         $data['status'] = sanitize_text_field($data['status']);
-        $data['image_url'] = esc_url_raw($data['image_url']);
+        
+        // Verifica se image_url é JSON (múltiplas imagens) ou URL única
+        if (!empty($data['image_url'])) {
+            // Tenta decodificar para verificar se é JSON
+            $json_check = json_decode($data['image_url']);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($json_check)) {
+                // É JSON válido, mantém como está (assumindo que as URLs internas já foram sanitizadas)
+            } else {
+                // Não é JSON, sanitiza como URL única
+                $data['image_url'] = esc_url_raw($data['image_url']);
+            }
+        }
+
+        // Sanitiza video_url
+        if (!empty($data['video_url'])) {
+            $data['video_url'] = esc_url_raw($data['video_url']);
+        }
 
         // Verifica se o produto existe usando HPOS (mantenha como está)
         if (!$this->product_exists($data['product_id'])) {
@@ -238,7 +255,7 @@ class WC_Custom_Reviews_Database {
         $result = $wpdb->insert(
             $this->table_name,
             $data,
-            array('%d', '%s', '%s', '%d', '%s', '%s', '%s')
+            array('%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s')
         );
 
         return $result ? $wpdb->insert_id : false;

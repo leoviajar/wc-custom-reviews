@@ -297,14 +297,20 @@ class WC_Custom_Reviews_Admin {
                             <td><?php _e('Não', 'wc-custom-reviews'); ?></td>
                             <td>https://exemplo.com/foto.jpg</td>
                         </tr>
+                        <tr>
+                            <td><code>video</code></td>
+                            <td><?php _e('URL do vídeo (YouTube, Vimeo ou MP4)', 'wc-custom-reviews'); ?></td>
+                            <td><?php _e('Não', 'wc-custom-reviews'); ?></td>
+                            <td>https://exemplo.com/video.mp4</td>
+                        </tr>
                     </tbody>
                 </table>
                 
                 <h4><?php _e('Exemplo de arquivo CSV:', 'wc-custom-reviews'); ?></h4>
-                <pre style="background: #f1f1f1; padding: 10px; border-radius: 4px; overflow-x: auto;">id,rating,name,email,review,photo
-123,5,João Silva,joao@email.com,Produto excelente! Recomendo.,https://exemplo.com/foto1.jpg
-124,4,Maria Santos,maria@email.com,Muito bom produto.,
-125,5,Pedro Costa,,Adorei a qualidade!,https://exemplo.com/foto2.jpg</pre>
+                <pre style="background: #f1f1f1; padding: 10px; border-radius: 4px; overflow-x: auto;">id,rating,name,email,review,photo,video
+123,5,João Silva,joao@email.com,Produto excelente! Recomendo.,https://exemplo.com/foto1.jpg,
+124,4,Maria Santos,maria@email.com,Muito bom produto.,,https://exemplo.com/video.mp4
+125,5,Pedro Costa,,Adorei a qualidade!,https://exemplo.com/foto2.jpg,</pre>
                 
                 <div class="notice notice-info inline">
                     <p><strong><?php _e('Dicas importantes:', 'wc-custom-reviews'); ?></strong></p>
@@ -421,7 +427,7 @@ class WC_Custom_Reviews_Admin {
 
         // Valida o cabeçalho
         $required_columns = array('id', 'rating', 'name', 'review');
-        $optional_columns = array('email', 'photo');
+        $optional_columns = array('email', 'photo', 'video');
         $all_columns = array_merge($required_columns, $optional_columns);
         
         foreach ($required_columns as $required) {
@@ -465,9 +471,38 @@ class WC_Custom_Reviews_Admin {
                 ? sanitize_email($data[$column_map['email']]) 
                 : 'noreply@' . parse_url(home_url(), PHP_URL_HOST);
                 
-            $photo_url = isset($column_map['photo']) && !empty($data[$column_map['photo']]) 
-                ? esc_url_raw($data[$column_map['photo']]) 
+            // NÃO usar esc_url_raw aqui pois pode quebrar múltiplas URLs separadas por vírgula
+            $photo_url_raw = isset($column_map['photo']) && !empty($data[$column_map['photo']]) 
+                ? $data[$column_map['photo']] 
                 : null;
+
+            $video_url = isset($column_map['video']) && !empty($data[$column_map['video']]) 
+                ? esc_url_raw($data[$column_map['video']]) 
+                : null;
+            
+            // Processamento inteligente de URLs misturadas em 'photo'
+            $photo_urls = array();
+            if (!empty($photo_url_raw)) {
+                // Remove aspas extras que podem vir do CSV mal formatado e espaços
+                $raw_urls = array_map('trim', explode(',', str_replace(array('"', "'"), '', $photo_url_raw)));
+                
+                foreach ($raw_urls as $url) {
+                    if (empty($url)) continue;
+                    
+                    // Verifica se é vídeo (extensão mp4, webm, ogg ou mov)
+                    if (preg_match('/\.(mp4|webm|ogg|mov)(\?.*)?$/i', $url)) {
+                        // Se ainda não temos vídeo, usa este
+                        if (empty($video_url)) {
+                            $video_url = esc_url_raw($url);
+                        }
+                    } else {
+                        // Assume que é imagem
+                        $photo_urls[] = $url;
+                    }
+                }
+            }
+
+            $review_data['video_url'] = $video_url;
             
             $review_data['status'] = $default_status;
 
@@ -499,44 +534,45 @@ class WC_Custom_Reviews_Admin {
                 continue;
             }
 
-            // NOVO: Processa download das imagens se necessário
-            if ($download_images && !empty($photo_url)) {
-                // Separa múltiplas URLs por vírgula
-                $photo_urls = array_map('trim', explode(',', $photo_url));
-                $image_urls_array = array();
-                
-                foreach ($photo_urls as $single_photo_url) {
-                    if (empty($single_photo_url)) continue;
-                    
-                    $attachment_id = $this->download_and_store_image($single_photo_url, $review_data['product_id']);
-                    if (!is_wp_error($attachment_id) && $attachment_id) {
-                        $image_urls_array[] = wp_get_attachment_url($attachment_id);
-                        $downloaded++;
-                    } else {
-                        // Se falhou o download, mantém a URL original
-                        $image_urls_array[] = $single_photo_url;
-                        $errors[] = sprintf(__('Linha %d: não foi possível baixar a imagem %s.', 'wc-custom-reviews'), $line_number, $single_photo_url);
+            // NOVO: Processa download de mídia (imagens e vídeos) se necessário
+            if ($download_images) {
+                // 1. Processa Vídeo
+                if (!empty($video_url)) {
+                    $vid_attachment_id = $this->download_and_store_image($video_url, $review_data['product_id']);
+                    if (!is_wp_error($vid_attachment_id) && $vid_attachment_id) {
+                        $review_data['video_url'] = wp_get_attachment_url($vid_attachment_id);
                     }
+                    // Se falhar, mantém a URL original que já está em $review_data['video_url']
                 }
-                
-                // Armazena como JSON se houver múltiplas imagens, ou única URL se for só uma
-                if (count($image_urls_array) > 1) {
+
+                // 2. Processa Imagens
+                if (!empty($photo_urls)) {
+                    $image_urls_array = array();
+                    
+                    foreach ($photo_urls as $single_photo_url) {
+                        if (empty($single_photo_url)) continue;
+                        
+                        $attachment_id = $this->download_and_store_image($single_photo_url, $review_data['product_id']);
+                        if (!is_wp_error($attachment_id) && $attachment_id) {
+                            $image_urls_array[] = wp_get_attachment_url($attachment_id);
+                            $downloaded++;
+                        } else {
+                            // Se falhou o download, mantém a URL original
+                            $image_urls_array[] = $single_photo_url;
+                            // Log de erro opcional
+                        }
+                    }
+                    
+                    // Armazena como JSON se houver múltiplas imagens, ou única URL se for só uma
+                    // Mas para consistência com o novo DB, melhor sempre JSON se for array
                     $review_data['image_url'] = json_encode($image_urls_array);
-                } elseif (count($image_urls_array) === 1) {
-                    $review_data['image_url'] = $image_urls_array[0];
                 } else {
                     $review_data['image_url'] = null;
                 }
-            } elseif (!empty($photo_url)) {
-                // Sem download, mas ainda processa múltiplas URLs
-                $photo_urls = array_map('trim', explode(',', $photo_url));
-                if (count($photo_urls) > 1) {
-                    $review_data['image_url'] = json_encode($photo_urls);
-                } else {
-                    $review_data['image_url'] = $photo_url;
-                }
+                
             } else {
-                $review_data['image_url'] = null;
+                // Sem download, mas ainda processa múltiplas URLs
+                $review_data['image_url'] = !empty($photo_urls) ? json_encode($photo_urls) : null;
             }
 
             // Insere a avaliação
@@ -585,18 +621,50 @@ class WC_Custom_Reviews_Admin {
         $file_url_path = parse_url($url, PHP_URL_PATH);
         $file_info = wp_check_filetype($file_url_path);
         
-        // Verifica se é um tipo de imagem válido
-        $allowed_types = array('image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp');
+        // Se não detectou extensão/tipo pela URL, tenta pelo conteúdo do arquivo
+        if (empty($file_info['type'])) {
+            $mime_type = mime_content_type($temp_file);
+            if ($mime_type) {
+                $file_info['type'] = $mime_type;
+                // Mapeia mime para extensão se necessário
+                $mimes_to_ext = array(
+                    'image/jpeg' => 'jpg',
+                    'image/jpg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                    'video/mp4' => 'mp4',
+                    'video/webm' => 'webm',
+                    'video/ogg' => 'ogv',
+                    'video/quicktime' => 'mov'
+                );
+                if (isset($mimes_to_ext[$mime_type])) {
+                    $file_info['ext'] = $mimes_to_ext[$mime_type];
+                }
+            }
+        }
+        
+        // Verifica se é um tipo de mídia válido (imagem ou vídeo)
+        $allowed_types = array(
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'
+        );
         if (!in_array($file_info['type'], $allowed_types)) {
             @unlink($temp_file);
-            return new WP_Error('invalid_image_type', __('Tipo de imagem não suportado.', 'wc-custom-reviews'));
+            return new WP_Error('invalid_media_type', __('Tipo de arquivo não suportado ou inválido.', 'wc-custom-reviews'));
+        }
+
+        // Garante que o nome do arquivo tenha extensão correta
+        $file_name = basename($file_url_path);
+        if (empty(pathinfo($file_name, PATHINFO_EXTENSION)) && !empty($file_info['ext'])) {
+            $file_name .= '.' . $file_info['ext'];
         }
 
         // Cria array similar ao $_FILES
         $file = array(
             'tmp_name' => $temp_file,
             'type'     => $file_info['type'],
-            'name'     => basename($file_url_path),
+            'name'     => $file_name,
             'size'     => filesize($temp_file),
         );
 
